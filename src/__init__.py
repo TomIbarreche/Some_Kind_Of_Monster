@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 from .config import settings
 from contextlib import asynccontextmanager
-
+from src.db import init_db
 @asynccontextmanager
 async def life_span(app:FastAPI):
     print("start")
-    yield
+    await init_db()
+
     print("after")
 
 app = FastAPI(
