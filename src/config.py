@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     developer_email: str
     developer_name: str
     developer_profile: str
-
+    database_url: str
     model_config= SettingsConfigDict(env_file=".env")
 
 settings = Settings()
