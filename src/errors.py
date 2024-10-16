@@ -1,0 +1,91 @@
+from typing import Any, Callable
+from fastapi import FastAPI, status
+from fastapi.requests import Request
+from fastapi.responses import JSONResponse
+
+class SomeKindOfException(Exception):
+    """Base class for all Some Kind of Monster Exceptions"""
+    def __init__(self, info):
+        self.info = info
+
+class UserAlreadyExists(SomeKindOfException):
+    """The user have registered informations that already exists"""
+
+class UserNotFound(SomeKindOfException):
+    """No User have been found with this informations"""
+
+class InvalidCredentials(SomeKindOfException):
+    """User have provided wrong informations during login """
+
+class UserNotVerified(SomeKindOfException):
+    """User have not been verified yet"""
+
+class TokenDecodeFail(SomeKindOfException):
+    """Something went wrong when decoding the authentification token"""
+
+def create_exception_handler(status_code:int, initial_details:Any) -> Callable[[Request, Exception], JSONResponse]:
+    async def exception_handler(request: Request, exception: SomeKindOfException):
+        return JSONResponse(
+            content= {
+                "initial_detials": initial_details,
+                "info": exception.__dict__.get("info")
+            },
+            status_code=status_code
+        )
+    return exception_handler
+
+def register_errors(app:FastAPI):
+    app.add_exception_handler(
+        UserAlreadyExists,
+        create_exception_handler(
+            status_code=status.HTTP_409_CONFLICT,
+            initial_details={
+                "message": UserAlreadyExists.__doc__,
+                "error_code":"user_already_exist"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        UserNotFound,
+        create_exception_handler(
+            status_code=status.HTTP_404_NOT_FOUND,
+            initial_details={
+                "message": UserNotFound.__doc__,
+                "error_code":"user_not_found"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        InvalidCredentials,
+        create_exception_handler(
+            status_code=status.HTTP_404_NOT_FOUND,
+            initial_details={
+                "message": InvalidCredentials.__doc__,
+                "error_code":"user_not_found"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        UserNotVerified,
+        create_exception_handler(
+            status_code=status.HTTP_403_FORBIDDEN,
+            initial_details={
+                "message": UserNotVerified.__doc__,
+                "error_code":"user_not_verified"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        TokenDecodeFail,
+        create_exception_handler(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            initial_details={
+                "message": TokenDecodeFail.__doc__,
+                "error_code":"token_decode_fail"
+            }
+        )
+    )

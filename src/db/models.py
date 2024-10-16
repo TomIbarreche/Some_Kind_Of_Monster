@@ -29,6 +29,7 @@ class User(SQLModel, table=True):
     last_name: str
     date_of_birth: date
     is_verified: bool = Field(default=False)
+    password_hash: str = Field(exclude=True)
     role: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="user"))
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP,default=datetime.now))
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP,default=datetime.now))
