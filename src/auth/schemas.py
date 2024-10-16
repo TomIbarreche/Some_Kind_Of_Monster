@@ -34,3 +34,10 @@ class UserOutModel(BaseModel):
     date_of_birth: date
     email: EmailStr
     role: str
+
+class UserUpdateModel(BaseModel):
+    username: str = Field(max_length=12, min_length=3)
+    first_name: str
+    last_name: str
+    date_of_birth: date
+    email: EmailStr

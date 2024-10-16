@@ -23,6 +23,9 @@ class UserNotVerified(SomeKindOfException):
 class TokenDecodeFail(SomeKindOfException):
     """Something went wrong when decoding the authentification token"""
 
+class UpdateNotAllowed(SomeKindOfException):
+    """This update is not allowed"""
+
 def create_exception_handler(status_code:int, initial_details:Any) -> Callable[[Request, Exception], JSONResponse]:
     async def exception_handler(request: Request, exception: SomeKindOfException):
         return JSONResponse(
@@ -86,6 +89,17 @@ def register_errors(app:FastAPI):
             initial_details={
                 "message": TokenDecodeFail.__doc__,
                 "error_code":"token_decode_fail"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        UpdateNotAllowed,
+        create_exception_handler(
+            status_code=status.HTTP_403_FORBIDDEN,
+            initial_details={
+                "message": UpdateNotAllowed.__doc__,
+                "error_code":"update_not_allowed"
             }
         )
     )

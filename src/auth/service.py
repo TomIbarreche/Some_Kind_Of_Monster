@@ -1,10 +1,11 @@
 import datetime
+from typing import List
 from fastapi.responses import JSONResponse
 from fastapi import status
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.auth.repository import UserRepository
-from src.auth.schemas import NewCreatedUserModel, UserCreationModel, UserLoginModel, UserOutModel
-from src.errors import UserAlreadyExists, UserNotFound, InvalidCredentials, UserNotVerified
+from src.auth.schemas import NewCreatedUserModel, UserCreationModel, UserLoginModel, UserOutModel, UserUpdateModel
+from src.errors import UpdateNotAllowed, UserAlreadyExists, UserNotFound, InvalidCredentials, UserNotVerified
 from src.db.models import User
 from src.auth.utils import Hasher, TokenMaker
 from src.enums import Role
@@ -15,20 +16,15 @@ class UserService:
         self.repository = UserRepository(session)
 
     async def create_user(self, user_data: UserCreationModel) -> NewCreatedUserModel:
-        result = await self.repository.check_if_user_exists(user_data)
-        if result[0] is not None:
-            raise UserAlreadyExists(info={"error": "This email is already registered by an other user", "data":f"Email: {user_data.email}"})
-        
-        if result[1] is not None:
-            raise UserAlreadyExists(info={"error": "This username is already registered by an other user", "data":f"Username: {user_data.username}"})
-        
-        user_data_dict = user_data.model_dump(exclude_none=True)
-        new_user = User(**user_data_dict)
-        new_user.password_hash = Hasher.hash_password(user_data_dict['password'])
-        new_user.role = Role.USER.value
-        
-        new_added_user = await self.repository.create_user(new_user)
-        return new_added_user
+        if not await self.check_if_user_exists(user_data):
+
+            user_data_dict = user_data.model_dump(exclude_none=True)
+            new_user = User(**user_data_dict)
+            new_user.password_hash = Hasher.hash_password(user_data_dict['password'])
+            new_user.role = Role.USER.value
+            
+            new_added_user = await self.repository.create_user(new_user)
+            return new_added_user
     
     async def create_default_admin(self) -> None:
         admin_data_dict = {
@@ -47,6 +43,16 @@ class UserService:
 
     async def check_if_admin_exists(self) -> bool:
         return await self.repository.check_if_admin_exists()
+    
+    async def check_if_user_exists(self, user_data: dict) -> bool:
+        user_exists_by_mail, user_exists_by_username = await self.repository.check_if_user_exists(user_data)
+        if user_exists_by_mail:
+            raise UserAlreadyExists(info={"error": "This email is already registered by an other user", "data":f"Email: {user_data.email}"})
+        
+        if user_exists_by_username:
+            raise UserAlreadyExists(info={"error": "This username is already registered by an other user", "data":f"Username: {user_data.username}"})
+        
+        return False
         
     async def log_user(self, user_data: UserLoginModel):
         user = await self.repository.get_user_by_email(user_data.email)
@@ -78,7 +84,40 @@ class UserService:
         user = await self.repository.get_user_by_email(user_email)
         if user is None:
             raise UserNotFound(info={"error": "The user with this email doesnt exists", "data":f"User email: {user_email}"})
+        return user
+        
+    async def get_all_users(self, search: str, limit: int, offset: int) -> List[UserOutModel]:
+        users = await self.repository.get_all_users(search, limit, offset)
+        return users
+    
+    async def get_user_by_id(self, user_id: int)-> UserOutModel:
+        user = await self.repository.get_user_by_id(user_id)
+        if user is None:
+            raise UserNotFound(info={"error": "No user with this id exists", "data":f"User id: {user_id}"})
         
         return user
-         
     
+    async def update_user_profile(self, user_id: int, user_data: UserUpdateModel, current_user: User) -> UserOutModel:
+        if user_id != current_user.id:
+            raise UpdateNotAllowed(info={"error": "You cant update a profile that is not yours"})
+        
+        user_to_update = await self.get_user_by_id(user_id)
+        if user_to_update.email == user_data.email and user_to_update.username == user_data.username:
+            user_to_update = await self.repository.update_user(user_to_update, user_data)
+        elif user_to_update.email != user_data.email and user_to_update.username == user_data.username:
+            if await self.repository.get_user_by_email(user_data.email) is not None:
+                raise UserAlreadyExists(info={"error": "This email is already registered by an other user", "data":f"Email: {user_data.email}"})
+            else:
+                user_to_update = await self.repository.update_user(user_to_update, user_data)
+        elif user_to_update.email == user_data.email and user_to_update.username != user_data.username:
+            if await self.repository.is_username_already_taken(user_data.username):
+                raise UserAlreadyExists(info={"error": "This username is already registered by an other user", "data":f"Username: {user_data.username}"})
+            else:
+                user_to_update = await self.repository.update_user(user_to_update, user_data)
+        else:
+            if not await self.check_if_user_exists(user_data):
+                user_to_update = await self.repository.update_user(user_to_update, user_data)
+
+        return user_to_update
+
+            
