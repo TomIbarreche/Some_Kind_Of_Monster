@@ -26,11 +26,14 @@ class TokenDecodeFail(SomeKindOfException):
 class UpdateNotAllowed(SomeKindOfException):
     """This update is not allowed"""
 
+class InsufficientPermission(SomeKindOfException):
+    """The user dont have enough permission to performed this action"""
+
 def create_exception_handler(status_code:int, initial_details:Any) -> Callable[[Request, Exception], JSONResponse]:
     async def exception_handler(request: Request, exception: SomeKindOfException):
         return JSONResponse(
             content= {
-                "initial_detials": initial_details,
+                "initial_details": initial_details,
                 "info": exception.__dict__.get("info")
             },
             status_code=status_code
@@ -100,6 +103,17 @@ def register_errors(app:FastAPI):
             initial_details={
                 "message": UpdateNotAllowed.__doc__,
                 "error_code":"update_not_allowed"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        InsufficientPermission,
+        create_exception_handler(
+            status_code=status.HTTP_403_FORBIDDEN,
+            initial_details={
+                "message": InsufficientPermission.__doc__,
+                "error_code": "insufficient_permission"
             }
         )
     )

@@ -5,12 +5,14 @@ from src.auth.schemas import NewCreatedUserModel, UserCreationModel, UserLoginMo
 from src.auth.service import UserService
 from src.db import get_session
 from sqlmodel.ext.asyncio.session import AsyncSession
-
 from src.db.models import User
-from .dependencies import TokenAccessBearer, get_current_user
+from .dependencies import TokenAccessBearer, get_current_user, RoleChecker
+from src.enums import Role
+
 auth_router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 access_token_bearer = TokenAccessBearer()
+admin_role_checker = RoleChecker([Role.ADMIN.value])
 
 @auth_router.post("/signup", status_code=status.HTTP_201_CREATED, response_model=NewCreatedUserModel)
 async def create_user(user_data: UserCreationModel, session: AsyncSession = Depends(get_session)):
@@ -27,7 +29,7 @@ async def get_current_user(user: User = Depends(get_current_user)):
     return user
 
 @auth_router.get("/all", status_code=status.HTTP_200_OK, response_model=List[UserOutModel])
-async def get_all_users(token_detail: dict = Depends(access_token_bearer), session: AsyncSession = Depends(get_session), search: str ="", limit: int = 10, offset: int = 0):
+async def get_all_users(role_checker: bool = Depends(admin_role_checker), token_detail: dict = Depends(access_token_bearer), session: AsyncSession = Depends(get_session), search: str ="", limit: int = 10, offset: int = 0):
     _service = UserService(session)
     return await _service.get_all_users(search, limit, offset)
 
