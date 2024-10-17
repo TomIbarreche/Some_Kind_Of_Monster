@@ -6,7 +6,7 @@ from src.auth.service import UserService
 from src.db import get_session
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.db.models import User
-from .dependencies import TokenAccessBearer, get_current_user, RoleChecker
+from src.dependencies import TokenAccessBearer, get_current_user, RoleChecker
 from src.enums import Role
 
 auth_router = APIRouter()

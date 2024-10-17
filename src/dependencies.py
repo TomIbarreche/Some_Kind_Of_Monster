@@ -5,7 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.auth.service import UserService
 from src.db import get_session
 from src.db.models import User
-from .utils import TokenMaker
+from .auth.utils import TokenMaker
 from src.enums import Role
 from src.errors import InsufficientPermission
 
