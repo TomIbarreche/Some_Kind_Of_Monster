@@ -32,6 +32,12 @@ class InsufficientPermission(SomeKindOfException):
 class RoleNotFound(SomeKindOfException):
     """No role have been found with this name"""
 
+class BookNotFound(SomeKindOfException):
+    """Book Not Found"""
+
+class BookAlreadyRegistered(SomeKindOfException):
+    """The user already have this book registered"""
+
 def create_exception_handler(status_code:int, initial_details:Any) -> Callable[[Request, Exception], JSONResponse]:
     async def exception_handler(request: Request, exception: SomeKindOfException):
         return JSONResponse(
@@ -128,6 +134,28 @@ def register_errors(app:FastAPI):
             initial_details={
                 "message": RoleNotFound.__doc__,
                 "error_code": "role_not_found"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        BookNotFound,
+        create_exception_handler(
+            status_code=status.HTTP_404_NOT_FOUND,
+            initial_details={
+                "message": BookNotFound.__doc__,
+                "error_code": "book_not_found"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        BookAlreadyRegistered,
+        create_exception_handler(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            initial_details={
+                "message": BookAlreadyRegistered.__doc__,
+                "error_code": "book_already_registered"
             }
         )
     )

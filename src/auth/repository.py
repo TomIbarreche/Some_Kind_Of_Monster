@@ -1,7 +1,8 @@
 from typing import List
 from sqlmodel import select, or_
 from sqlmodel.ext.asyncio.session import AsyncSession
-from src.auth.schemas import NewCreatedUserModel, UserCreationModel, UserOutModel, UserUpdateModel
+from src.auth.schemas import NewCreatedUserModel, UserCreationModel, UserOutModel, UserOutModelWithBooks, UserUpdateModel
+from src.books.schemas import BookModelOut
 from src.db.models import User
 from src.enums import Role
 class UserRepository:
@@ -55,5 +56,15 @@ class UserRepository:
         for k,v in user_data_dict.items():
             setattr(user_to_update, k, v)
 
+        await self.session.commit()
+        return user_to_update
+    
+    async def add_book_to_user(self,user_to_update: UserOutModelWithBooks, book_to_add: BookModelOut) -> UserOutModel:
+        user_to_update.books.append(book_to_add)
+        await self.session.commit()
+        return user_to_update
+    
+    async def remove_book_to_user(self,user_to_update: UserOutModelWithBooks, book_to_remove: BookModelOut) -> UserOutModel:
+        user_to_update.books.remove(book_to_remove)
         await self.session.commit()
         return user_to_update

@@ -4,8 +4,9 @@ from fastapi.responses import JSONResponse
 from fastapi import status
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.auth.repository import UserRepository
-from src.auth.schemas import NewCreatedUserModel, UserCreationModel, UserLoginModel, UserOutModel, UserUpdateModel
-from src.errors import UpdateNotAllowed, UserAlreadyExists, UserNotFound, InvalidCredentials, UserNotVerified, RoleNotFound
+from src.auth.schemas import NewCreatedUserModel, UserCreationModel, UserLoginModel, UserOutModel, UserOutModelWithBooks, UserUpdateModel
+from src.books.service import BookService
+from src.errors import BookAlreadyRegistered, BookNotFound, UpdateNotAllowed, UserAlreadyExists, UserNotFound, InvalidCredentials, UserNotVerified, RoleNotFound
 from src.db.models import User
 from src.auth.utils import Hasher, TokenMaker
 from src.enums import Role
@@ -14,6 +15,7 @@ from src.config import settings
 class UserService:
     def __init__(self, session: AsyncSession):
         self.repository = UserRepository(session)
+        self.book_service = BookService(session)
 
     async def create_user(self, user_data: UserCreationModel) -> NewCreatedUserModel:
         if not await self.check_if_user_exists(user_data):
@@ -86,11 +88,11 @@ class UserService:
             raise UserNotFound(info={"error": "The user with this email doesnt exists", "data":f"User email: {user_email}"})
         return user
         
-    async def get_all_users(self, search: str, limit: int, offset: int) -> List[UserOutModel]:
+    async def get_all_users(self, search: str, limit: int, offset: int) -> List[UserOutModelWithBooks]:
         users = await self.repository.get_all_users(search, limit, offset)
         return users
     
-    async def get_user_by_id(self, user_id: int)-> UserOutModel:
+    async def get_user_by_id(self, user_id: int)-> UserOutModelWithBooks:
         user = await self.repository.get_user_by_id(user_id)
         if user is None:
             raise UserNotFound(info={"error": "No user with this id exists", "data":f"User id: {user_id}"})
@@ -129,4 +131,15 @@ class UserService:
 
         return await self.repository.update_user(user_to_update,user_role)
 
-            
+    async def update_user_book(self, user_id: int, book_id: int, current_user: User) -> UserOutModelWithBooks:
+        if user_id != current_user.id:
+            raise UpdateNotAllowed(info={"error": "You can only registered/delete book to your own account"})
+        
+        user_to_update = await self.get_user_by_id(user_id)
+        book = await self.book_service.get_book_by_id(book_id)
+        if book in user_to_update.books:
+           return await self.repository.remove_book_to_user(user_to_update, book)
+        else:
+            return await self.repository.add_book_to_user(user_to_update, book)
+
+    

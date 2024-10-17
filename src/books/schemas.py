@@ -10,6 +10,8 @@ class BookModelOut(BaseModel):
     author: str
     editor: str
     is_omnibus: bool
+    users: List["UserOutModel"]
+    creator_id: int
 
 class BookCreatedModel(BaseModel):
     id: int

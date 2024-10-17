@@ -1,6 +1,8 @@
 from datetime import date
+from typing import List
 from pydantic import BaseModel, EmailStr, Field
 
+from src.db.models import Book
 from src.enums import Role
 
 class UserCreationModel(BaseModel):
@@ -46,3 +48,6 @@ class UserUpdateModel(BaseModel):
 
 class UserUpdateRoleModel(BaseModel):
     role: str
+
+class UserOutModelWithBooks(UserOutModel):
+    books: List["Book"]
