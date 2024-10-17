@@ -41,7 +41,7 @@ class UserRepository:
     async def get_all_users(self, search: str, limit: int, offset: int) -> List[UserOutModel]:
         statement = select(User).where(or_(User.username.like('%' + search + '%'), User.first_name.like('%' + search + '%'),User.last_name.like('%' + search + '%'), User.email.like('%' + search + '%'))).order_by(User.created_at).offset(offset).limit(limit)
         result = await self.session.exec(statement)
-        users = result.all()
+        users = result.unique()
         return users
     
     async def get_user_by_id(self, user_id: int) ->UserOutModel:
@@ -50,8 +50,7 @@ class UserRepository:
         user = result.first()
         return user
     
-    async def update_user(self,user_to_update: User, user_data: UserUpdateModel):
-        us = await self.get_user_by_email(user_data.email)
+    async def update_user(self,user_to_update: User, user_data: dict):
         user_data_dict = user_data.model_dump()
         for k,v in user_data_dict.items():
             setattr(user_to_update, k, v)

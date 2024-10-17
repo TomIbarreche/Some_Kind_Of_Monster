@@ -26,7 +26,7 @@ async def get_current_user(token_details: dict = Depends(TokenAccessBearer()), s
     
     return current_user
 
-class RoleChecker():
+class RoleChecker:
 
     def __init__(self, allowed_roles_list: List[Role]) -> None:
         self.allowed_roles_list = allowed_roles_list

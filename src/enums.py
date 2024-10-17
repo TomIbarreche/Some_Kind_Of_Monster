@@ -3,6 +3,7 @@ from enum import Enum
 class Role(Enum):
     USER = "user"
     ADMIN= "admin"
+    CONTENT_CREATOR="content_creator"
 
     def __to_list__(self):
         to_list = []

@@ -1,6 +1,8 @@
 from datetime import date
 from pydantic import BaseModel, EmailStr, Field
 
+from src.enums import Role
+
 class UserCreationModel(BaseModel):
     username: str = Field(max_length=12, min_length=3)
     password: str = Field(min_length=8)
@@ -41,3 +43,6 @@ class UserUpdateModel(BaseModel):
     last_name: str
     date_of_birth: date
     email: EmailStr
+
+class UserUpdateRoleModel(BaseModel):
+    role: str

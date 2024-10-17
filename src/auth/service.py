@@ -5,7 +5,7 @@ from fastapi import status
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.auth.repository import UserRepository
 from src.auth.schemas import NewCreatedUserModel, UserCreationModel, UserLoginModel, UserOutModel, UserUpdateModel
-from src.errors import UpdateNotAllowed, UserAlreadyExists, UserNotFound, InvalidCredentials, UserNotVerified
+from src.errors import UpdateNotAllowed, UserAlreadyExists, UserNotFound, InvalidCredentials, UserNotVerified, RoleNotFound
 from src.db.models import User
 from src.auth.utils import Hasher, TokenMaker
 from src.enums import Role
@@ -119,5 +119,14 @@ class UserService:
                 user_to_update = await self.repository.update_user(user_to_update, user_data)
 
         return user_to_update
+    
+    async def update_user_role(self, user_id: int, user_role) -> UserOutModel:
+        available_roles = Role.__to_list__(self)
+        if user_role.role not in available_roles:
+            raise RoleNotFound(info={"error":"This role doesnt exists", "data":f"Role : {user_role.role}"})
+                               
+        user_to_update = await self.get_user_by_id(user_id)
+
+        return await self.repository.update_user(user_to_update,user_role)
 
             

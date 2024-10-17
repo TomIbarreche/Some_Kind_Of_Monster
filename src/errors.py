@@ -29,6 +29,9 @@ class UpdateNotAllowed(SomeKindOfException):
 class InsufficientPermission(SomeKindOfException):
     """The user dont have enough permission to performed this action"""
 
+class RoleNotFound(SomeKindOfException):
+    """No role have been found with this name"""
+
 def create_exception_handler(status_code:int, initial_details:Any) -> Callable[[Request, Exception], JSONResponse]:
     async def exception_handler(request: Request, exception: SomeKindOfException):
         return JSONResponse(
@@ -114,6 +117,17 @@ def register_errors(app:FastAPI):
             initial_details={
                 "message": InsufficientPermission.__doc__,
                 "error_code": "insufficient_permission"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        RoleNotFound,
+        create_exception_handler(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            initial_details={
+                "message": RoleNotFound.__doc__,
+                "error_code": "role_not_found"
             }
         )
     )
