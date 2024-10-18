@@ -51,3 +51,6 @@ class UserUpdateRoleModel(BaseModel):
 
 class UserOutModelWithBooks(UserOutModel):
     books: List["Book"]
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr

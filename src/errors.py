@@ -38,6 +38,9 @@ class BookNotFound(SomeKindOfException):
 class BookAlreadyRegistered(SomeKindOfException):
     """The user already have this book registered"""
 
+class UserVerificationFailed(SomeKindOfException):
+    """Something went wrong during user verification by email"""
+
 def create_exception_handler(status_code:int, initial_details:Any) -> Callable[[Request, Exception], JSONResponse]:
     async def exception_handler(request: Request, exception: SomeKindOfException):
         return JSONResponse(
@@ -156,6 +159,17 @@ def register_errors(app:FastAPI):
             initial_details={
                 "message": BookAlreadyRegistered.__doc__,
                 "error_code": "book_already_registered"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        UserVerificationFailed,
+        create_exception_handler(
+            status_code=status.HTTP_417_EXPECTATION_FAILED,
+            initial_details={
+                "message": UserVerificationFailed.__doc__,
+                "error_code": "user_verification_failed"
             }
         )
     )

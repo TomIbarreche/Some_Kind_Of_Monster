@@ -3,7 +3,10 @@ from src.errors import TokenDecodeFail
 from passlib.context import CryptContext
 import jwt
 from src.config import settings
+from itsdangerous import  URLSafeTimedSerializer
+import logging
 
+url_serializer = URLSafeTimedSerializer(settings.url_secret_key, salt=settings.url_email_salt)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class Hasher():
@@ -32,4 +35,20 @@ class TokenMaker():
             return token_data
         except Exception as err:
             raise TokenDecodeFail(info=f"{err}")
+        
+class UrlSerializer():
+    @staticmethod
+    def create_url_safe_token(token_data: dict) -> str:
+        token = url_serializer.dumps(obj=token_data)
+        return token
+    
+    @staticmethod
+    def decode_url_safe_token(token: str):
+        try:
+            token_data = url_serializer.loads(token)
+            return token_data
+        except Exception as e:
+            raise e
+ 
+
         

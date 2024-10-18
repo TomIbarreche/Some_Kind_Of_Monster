@@ -1,23 +1,24 @@
 import datetime
 from typing import List
 from fastapi.responses import JSONResponse
-from fastapi import status
+from fastapi import status, BackgroundTasks
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.auth.repository import UserRepository
-from src.auth.schemas import NewCreatedUserModel, UserCreationModel, UserLoginModel, UserOutModel, UserOutModelWithBooks, UserUpdateModel
+from src.auth.schemas import NewCreatedUserModel, PasswordResetRequest, UserCreationModel, UserLoginModel, UserOutModel, UserOutModelWithBooks, UserUpdateModel
 from src.books.service import BookService
-from src.errors import BookAlreadyRegistered, BookNotFound, UpdateNotAllowed, UserAlreadyExists, UserNotFound, InvalidCredentials, UserNotVerified, RoleNotFound
+from src.errors import UpdateNotAllowed, UserAlreadyExists, UserNotFound, InvalidCredentials, UserNotVerified, RoleNotFound, UserVerificationFailed
 from src.db.models import User
-from src.auth.utils import Hasher, TokenMaker
+from src.auth.utils import Hasher, TokenMaker, UrlSerializer
 from src.enums import Role
 from src.config import settings
+from src.mail import mail, create_message
 
 class UserService:
     def __init__(self, session: AsyncSession):
         self.repository = UserRepository(session)
         self.book_service = BookService(session)
 
-    async def create_user(self, user_data: UserCreationModel) -> NewCreatedUserModel:
+    async def create_user(self, user_data: UserCreationModel, bg_task: BackgroundTasks) -> NewCreatedUserModel:
         if not await self.check_if_user_exists(user_data):
 
             user_data_dict = user_data.model_dump(exclude_none=True)
@@ -26,6 +27,18 @@ class UserService:
             new_user.role = Role.USER.value
             
             new_added_user = await self.repository.create_user(new_user)
+            subject = settings.verified_mail_subject
+            recipient= [new_added_user.email]
+            token = UrlSerializer.create_url_safe_token({"email":new_added_user.email})
+            link = f"http://{settings.domain_name}{settings.api_prefix}/auth/verify/{token}"
+            body = f"""
+            <h1>Please verify your email</h1>
+            <p>Follow this <a href={link}>link</a> to verify your email</p>
+            """
+
+            message = create_message(recipients=recipient,subject=subject,body=body)
+            bg_task.add_task(mail.send_message,message)
+
             return new_added_user
     
     async def create_default_admin(self) -> None:
@@ -142,4 +155,31 @@ class UserService:
         else:
             return await self.repository.add_book_to_user(user_to_update, book)
 
-    
+    async def verify_user(self, token: str):
+        try:
+            token_data = UrlSerializer.decode_url_safe_token(token)
+            user_email = token_data.get("email")
+        except Exception:
+            raise UserVerificationFailed(info={"error": "Can't access user email from token verification"})
+            
+        if user_email is not None:
+            user_to_update = await self.get_user_by_email(user_email)
+            
+        if user_to_update:
+            user_to_update = await self.repository.update_user(user_to_update, {"is_verified":True})
+
+    async def password_reset_request(self, user_email: PasswordResetRequest, bg_task: BackgroundTasks):
+        email = user_email.email
+        token = UrlSerializer.create_url_safe_token({"email": email})
+        subject = settings.password_reset_request_mail_subject
+        recipient= [email]
+        link = f"http://{settings.domain_name}{settings.api_prefix}/auth/password_reset_confirm/{token}"
+        body = f"""
+        <h1>Reset your password</h1>
+        <p>Follow this <a href={link}>link</a> to reset your password </p>
+        """
+
+        message = create_message(recipients=recipient,subject=subject,body=body)
+        bg_task.add_task(mail.send_message,message)
+
+

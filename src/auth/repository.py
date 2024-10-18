@@ -52,8 +52,7 @@ class UserRepository:
         return user
     
     async def update_user(self,user_to_update: User, user_data: dict):
-        user_data_dict = user_data.model_dump()
-        for k,v in user_data_dict.items():
+        for k,v in user_data.items():
             setattr(user_to_update, k, v)
 
         await self.session.commit()

@@ -1,7 +1,8 @@
 from typing import List
-from fastapi import APIRouter, Depends,status
+from fastapi import APIRouter, Depends,status, BackgroundTasks
+from fastapi.responses import JSONResponse
 from fastapi.security import  OAuth2PasswordBearer
-from src.auth.schemas import NewCreatedUserModel, UserCreationModel, UserLoginModel, UserOutModel, UserOutModelWithBooks, UserUpdateModel, UserUpdateRoleModel
+from src.auth.schemas import NewCreatedUserModel, PasswordResetRequest, UserCreationModel, UserLoginModel, UserOutModel, UserOutModelWithBooks, UserUpdateModel, UserUpdateRoleModel
 from src.auth.service import UserService
 from src.db import get_session
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -9,15 +10,20 @@ from src.db.models import User
 from src.dependencies import TokenAccessBearer, get_current_user, RoleChecker
 from src.enums import Role
 
+
 auth_router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 access_token_bearer = Depends(TokenAccessBearer())
 admin_role_checker =  Depends(RoleChecker([Role.ADMIN.value]))
 
-@auth_router.post("/signup", status_code=status.HTTP_201_CREATED, response_model=NewCreatedUserModel)
-async def create_user(user_data: UserCreationModel, session: AsyncSession = Depends(get_session)):
+@auth_router.post("/signup", status_code=status.HTTP_201_CREATED)
+async def create_user(user_data: UserCreationModel,bg_task: BackgroundTasks, session: AsyncSession = Depends(get_session), ):
     _service = UserService(session)
-    return await _service.create_user(user_data)
+    new_user = await _service.create_user(user_data, bg_task)
+    return {
+        "message": "User successfully created. Check your email to verify your account",
+        "user": new_user
+    }
 
 @auth_router.post("/login", status_code=status.HTTP_200_OK)
 async def login_user(user_data: UserLoginModel, session: AsyncSession = Depends(get_session)):
@@ -56,3 +62,26 @@ async def update_user_role(
 async def update_user_book(user_id: int, book_id:int, current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)):
     _service = UserService(session)
     return await _service.update_user_book(user_id, book_id, current_user)
+
+@auth_router.get("/verify/{token}")
+async def verify_user(token: str, session: AsyncSession = Depends(get_session)):
+    _service = UserService(session)
+    await _service.verify_user(token)
+    return JSONResponse(
+        content= {
+            "message": "User successfully verified"
+        },
+        status_code=status.HTTP_202_ACCEPTED
+    )
+
+@auth_router.post("/password_reset_request")
+async def password_reset_request(email: PasswordResetRequest, bg_task: BackgroundTasks, session: AsyncSession = Depends(get_session)):
+    _service = UserService(session)
+    await _service.password_reset_request(email, bg_task)
+    return {
+        "message":"Check your emails to reset your password"
+    }
+
+@auth_router.post("/password_reset_confirm/{token}")
+async def password_reset_confirm():
+    print("coin")
