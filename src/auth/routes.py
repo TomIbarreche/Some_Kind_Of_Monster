@@ -2,7 +2,7 @@ from typing import List
 from fastapi import APIRouter, Depends,status, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.security import  OAuth2PasswordBearer
-from src.auth.schemas import NewCreatedUserModel, PasswordResetRequest, UserCreationModel, UserLoginModel, UserOutModel, UserOutModelWithBooks, UserUpdateModel, UserUpdateRoleModel
+from src.auth.schemas import PasswordResetRequest, PasswordResetConfirm, UserCreationModel, UserLoginModel, UserOutModel, UserOutModelWithBooks, UserUpdateModel, UserUpdateRoleModel
 from src.auth.service import UserService
 from src.db import get_session
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -83,5 +83,12 @@ async def password_reset_request(email: PasswordResetRequest, bg_task: Backgroun
     }
 
 @auth_router.post("/password_reset_confirm/{token}")
-async def password_reset_confirm():
-    print("coin")
+async def password_reset_confirm(token: str, password_data: PasswordResetConfirm, session: AsyncSession = Depends(get_session)):
+    _service = UserService(session)
+    await _service.password_reset_confirm(token, password_data)
+    return JSONResponse(
+        content={
+            "message":"Password successfully reset"
+        },
+        status_code=status.HTTP_200_OK
+    )

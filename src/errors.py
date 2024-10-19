@@ -1,11 +1,11 @@
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 from fastapi import FastAPI, status
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 
 class SomeKindOfException(Exception):
     """Base class for all Some Kind of Monster Exceptions"""
-    def __init__(self, info):
+    def __init__(self, info:Optional[dict]=""):
         self.info = info
 
 class UserAlreadyExists(SomeKindOfException):
@@ -40,6 +40,9 @@ class BookAlreadyRegistered(SomeKindOfException):
 
 class UserVerificationFailed(SomeKindOfException):
     """Something went wrong during user verification by email"""
+
+class ResetPasswordDontMatch(SomeKindOfException):
+    """The confirm password doesnt match the new password"""
 
 def create_exception_handler(status_code:int, initial_details:Any) -> Callable[[Request, Exception], JSONResponse]:
     async def exception_handler(request: Request, exception: SomeKindOfException):
@@ -170,6 +173,17 @@ def register_errors(app:FastAPI):
             initial_details={
                 "message": UserVerificationFailed.__doc__,
                 "error_code": "user_verification_failed"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        ResetPasswordDontMatch,
+        create_exception_handler(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            initial_details={
+                "message": ResetPasswordDontMatch.__doc__,
+                "error_code":"password_reset_dont_match"
             }
         )
     )

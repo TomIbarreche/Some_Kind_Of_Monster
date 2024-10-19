@@ -54,3 +54,7 @@ class UserOutModelWithBooks(UserOutModel):
 
 class PasswordResetRequest(BaseModel):
     email: EmailStr
+
+class PasswordResetConfirm(BaseModel):
+    new_password: str = Field(min_length=8)
+    confirm_password: str = Field(min_length=8)

@@ -4,9 +4,9 @@ from fastapi.responses import JSONResponse
 from fastapi import status, BackgroundTasks
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.auth.repository import UserRepository
-from src.auth.schemas import NewCreatedUserModel, PasswordResetRequest, UserCreationModel, UserLoginModel, UserOutModel, UserOutModelWithBooks, UserUpdateModel
+from src.auth.schemas import NewCreatedUserModel, PasswordResetConfirm, PasswordResetRequest, UserCreationModel, UserLoginModel, UserOutModel, UserOutModelWithBooks, UserUpdateModel
 from src.books.service import BookService
-from src.errors import UpdateNotAllowed, UserAlreadyExists, UserNotFound, InvalidCredentials, UserNotVerified, RoleNotFound, UserVerificationFailed
+from src.errors import UpdateNotAllowed, UserAlreadyExists, UserNotFound, InvalidCredentials, UserNotVerified, RoleNotFound, UserVerificationFailed, ResetPasswordDontMatch
 from src.db.models import User
 from src.auth.utils import Hasher, TokenMaker, UrlSerializer
 from src.enums import Role
@@ -182,4 +182,20 @@ class UserService:
         message = create_message(recipients=recipient,subject=subject,body=body)
         bg_task.add_task(mail.send_message,message)
 
+    async def password_reset_confirm(self, token :str, password_data: PasswordResetConfirm):
+        try:
+            token_data = UrlSerializer.decode_url_safe_token(token)
+            user_email = token_data.get("email")
+        except:
+            raise UserVerificationFailed(info={"error": "Can't access user email from token verification"})
+        
+        if user_email is not None: 
+            user_to_update = await self.get_user_by_email(user_email)
+
+        if password_data.confirm_password != password_data.new_password:
+            raise ResetPasswordDontMatch(info="")
+        
+        password_hash = Hasher.hash_password(password_data.confirm_password)
+
+        user_to_update = await self.repository.update_user(user_to_update, {"password_hash":password_hash})
 
