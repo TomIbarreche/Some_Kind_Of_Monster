@@ -32,3 +32,6 @@ class BookCreateModel(BaseModel):
     author: str
     editor: str
     is_omnibus: bool
+
+    class Config:
+        from_attributes = True

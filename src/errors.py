@@ -44,6 +44,9 @@ class UserVerificationFailed(SomeKindOfException):
 class ResetPasswordDontMatch(SomeKindOfException):
     """The confirm password doesnt match the new password"""
 
+class UpdateRequestNotAllowed(SomeKindOfException):
+    "This update request is not allowed"
+
 def create_exception_handler(status_code:int, initial_details:Any) -> Callable[[Request, Exception], JSONResponse]:
     async def exception_handler(request: Request, exception: SomeKindOfException):
         return JSONResponse(
@@ -184,6 +187,17 @@ def register_errors(app:FastAPI):
             initial_details={
                 "message": ResetPasswordDontMatch.__doc__,
                 "error_code":"password_reset_dont_match"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        UpdateRequestNotAllowed,
+        create_exception_handler(
+            status_code=status.HTTP_403_FORBIDDEN,
+            initial_details={
+                "message": UpdateRequestNotAllowed.__doc__,
+                "error_code":"update_request_not_allowed"
             }
         )
     )
