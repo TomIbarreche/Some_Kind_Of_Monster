@@ -45,7 +45,6 @@ class RequestService:
                 token = UrlSerializer.create_url_safe_token({"email":creator.email})
                 message_data_dict["token"] = token
                 message_data_dict["subject"] = settings.update_request_mail_subject
-                # data = json.dumps(data_dict)
                 message_data = json.dumps(message_data_dict)
                 try:
                     channel.queue_declare(queue=settings.routing_key, durable=True)
