@@ -4,7 +4,6 @@ from sqlalchemy import Column
 from sqlmodel import Field, Relationship, SQLModel
 import sqlalchemy.dialects.postgresql as pg
 
-
 class CulturalProductBase(SQLModel):
     name: str = Field(index=True)
     published_date: date
@@ -26,8 +25,6 @@ class Book(CulturalProductBase, table=True):
     creator_id: int = Field(nullable=False)
     users: list["User"] = Relationship(back_populates="books", link_model=UserBookLink, sa_relationship_kwargs={'lazy': 'joined'})
     
-
-
 class User(SQLModel, table=True):
     __tablename__="users"
     id: int = Field(default=None, primary_key=True)
@@ -42,3 +39,11 @@ class User(SQLModel, table=True):
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP,default=datetime.now))
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP,default=datetime.now))
     books: list["Book"] = Relationship(back_populates="users", link_model=UserBookLink, sa_relationship_kwargs={'lazy': 'joined'})
+
+class Request(SQLModel, table=True):
+    __tablename__="requests"
+    id: int = Field(default=None, primary_key=True)
+    requester_id: int | None = Field(default=None, foreign_key="users.id")
+    book_update_data: str
+    owner_id: int | None = Field(default=None, foreign_key="users.id")
+    book_id: int | None = Field(default=None, foreign_key="books.id")

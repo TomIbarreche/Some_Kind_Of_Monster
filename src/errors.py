@@ -47,6 +47,12 @@ class ResetPasswordDontMatch(SomeKindOfException):
 class UpdateRequestNotAllowed(SomeKindOfException):
     "This update request is not allowed"
 
+class RequestCheckNotAllowed(SomeKindOfException):
+    """The user cant check this request"""
+
+class RequestNotFound(SomeKindOfException):
+    """Request not found"""
+    
 def create_exception_handler(status_code:int, initial_details:Any) -> Callable[[Request, Exception], JSONResponse]:
     async def exception_handler(request: Request, exception: SomeKindOfException):
         return JSONResponse(
@@ -198,6 +204,28 @@ def register_errors(app:FastAPI):
             initial_details={
                 "message": UpdateRequestNotAllowed.__doc__,
                 "error_code":"update_request_not_allowed"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        RequestCheckNotAllowed,
+        create_exception_handler(
+            status_code=status.HTTP_403_FORBIDDEN,
+            initial_details={
+                "message": RequestCheckNotAllowed.__doc__,
+                "error_code":"request_check_not_allowed"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        RequestNotFound,
+        create_exception_handler(
+            status_code=status.HTTP_403_FORBIDDEN,
+            initial_details={
+                "message": RequestNotFound.__doc__,
+                "error_code":"request_not_found"
             }
         )
     )
