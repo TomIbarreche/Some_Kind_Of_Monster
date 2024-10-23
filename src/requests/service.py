@@ -1,54 +1,60 @@
+import time
+from fastapi import Depends
+import pika.exceptions
+import pika.spec
 from sqlmodel.ext.asyncio.session import AsyncSession
-
+import requests
+from src.auth.service import UserService
 from src.books.schemas import BookCreateModel
 from src.db.models import User
-from src.errors import UpdateRequestNotAllowed
+from src.mail import create_message
+from src.errors import UpdateRequestNotAllowed, UserVerificationFailed
 import pika
 import json
+from src.auth.utils import UrlSerializer
+from src.config import settings
 connection_parameters = pika.ConnectionParameters('localhost')
-
-connection = pika.BlockingConnection(connection_parameters)
-
-channel = connection.channel()
-
-channel.queue_declare(queue="letterbox")
-
-
-
-def on_message_received(channel, method, properties, body):
-    print(f"receive new message {body}")
-    channel.stop_consuming()
 
 
 class RequestService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_update_book_request(self,book_id, update_data: BookCreateModel, current_user:User):
+
+    def connect_to_rabbitmq(self):
+        while True:
+            try:
+                connection = pika.BlockingConnection(connection_parameters)
+                return connection
+            except pika.exceptions.AMQPConnectionError:
+                print("Failed to connect to RabbitMq. Retrying in 5seconds...")
+                time.sleep(5)
+
+
+    async def create_update_book_request(self,book_id, update_data: BookCreateModel, current_user:User, session: AsyncSession):
+        _userService = UserService(session)
+        connection = self.connect_to_rabbitmq()
+        channel = connection.channel()
         data = update_data.model_dump_json()
+        data_dict = json.loads(data)
+        message_data_dict = {}
         for book in current_user.books:
             if book.id == book_id:
-                print(data)
-                print("Create the request message for rabbitmq")
-                print(book.creator_id)
-                
-
-            
-
-                channel.basic_publish(exchange="", routing_key="letterbox", body=data)
-
-                print(f"sent message {data} ")
-
-                
-
-        #raise UpdateRequestNotAllowed(info={"error": "User can ask for an update request only on his registered books"})
-
-    async def check_requests(self):
-        channel.basic_consume(queue="letterbox", auto_ack=True, on_message_callback=on_message_received)
-
-        print('starting consuming')
+                creator = await _userService.get_user_by_id(book.creator_id)
+                message_data_dict["mail"] = creator.email
+                token = UrlSerializer.create_url_safe_token({"email":creator.email})
+                message_data_dict["token"] = token
+                message_data_dict["subject"] = settings.update_request_mail_subject
+                # data = json.dumps(data_dict)
+                message_data = json.dumps(message_data_dict)
+                try:
+                    channel.queue_declare(queue=settings.routing_key, durable=True)
+                    channel.basic_publish(exchange="", routing_key=settings.routing_key, body=message_data, properties=pika.BasicProperties(delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE))
+                except Exception as err:
+                    print(f"Failed to publish message: {err}")
+                finally:
+                    channel.close()
+                    connection.close()
         
-        channel.start_consuming()
+        #raise UpdateRequestNotAllowed(info={"error":"You can only ask for update request on a book you have registered", "data":f"Book id: {book_id}"})
 
-        print("stop")
-        return {}

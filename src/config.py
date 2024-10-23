@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     domain_name: str
     url_secret_key: str
     url_email_salt: str
-    password_reset_request_mail_subject: str
+    routing_key: str
+    update_request_mail_subject: str
 
     model_config= SettingsConfigDict(env_file=".env")
 
