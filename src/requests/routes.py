@@ -1,3 +1,4 @@
+from typing import List
 from fastapi import APIRouter, status, Depends
 
 from src.books.schemas import BookCreateModel
@@ -20,5 +21,11 @@ async def create_update_book_request(book_id: int,update_data: BookCreateModel, 
 @requests_router.get("/check_requests/{token}", status_code=status.HTTP_200_OK, response_model=CreateRequestOut, dependencies=[content_creator_role_checker])
 async def check_request_from_mail(token:str, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
     _service = RequestService(session)
-    request =await _service.get_request_from_mail(token, current_user)
+    request = await _service.get_request_from_mail(token, current_user)
     return request
+
+@requests_router.get("/user/{user_id}", status_code=status.HTTP_200_OK, response_model=List[CreateRequestOut], dependencies=[content_creator_role_checker])
+async def get_all_user_request(user_id: int, session: AsyncSession = Depends(get_session)):
+    _service = RequestService(session)
+    requests = await _service.get_requests_for_user(user_id)
+    return requests

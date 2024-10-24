@@ -1,4 +1,5 @@
 import time
+from typing import List
 from fastapi import Depends
 import pika.exceptions
 import pika.spec
@@ -14,12 +15,15 @@ import json
 from src.auth.utils import UrlSerializer
 from src.config import settings
 from src.requests.repository import RequestRepository
+from src.requests.schemas import CreateRequestOut
+
 connection_parameters = pika.ConnectionParameters('localhost')
 
 
 class RequestService:
     def __init__(self, session: AsyncSession):
         self.repository = RequestRepository(session)
+        self._userService = UserService(session)
 
     def connect_to_rabbitmq(self):
         while True:
@@ -31,15 +35,14 @@ class RequestService:
                 time.sleep(5)
 
 
-    async def create_update_book_request(self,book_id, update_data: BookCreateModel, current_user:User, session: AsyncSession):
-        _userService = UserService(session)
+    async def create_update_book_request(self,book_id, update_data: BookCreateModel, current_user:User, session: AsyncSession)-> CreateRequestOut:
         connection = self.connect_to_rabbitmq()
         channel = connection.channel()
         message_data_dict = {}
         for book in current_user.books:
             if book.id == book_id:
                 data = update_data.model_dump_json()
-                creator = await _userService.get_user_by_id(book.creator_id)
+                creator = await self._userService.get_user_by_id(book.creator_id)
                 new_request = Request(requester_id=current_user.id, book_update_data=data, owner_id=creator.id, book_id=book.id)
                 new_request = await self.repository.create_book_update_request(new_request)
                 message_data_dict["mail"] = creator.email
@@ -59,7 +62,7 @@ class RequestService:
 
         raise UpdateRequestNotAllowed(info={"error":"You can only ask for update request on a book you have registered", "data":f"Book id: {book_id}"})
 
-    async def get_request_from_mail(self, token: str, current_user: User):
+    async def get_request_from_mail(self, token: str, current_user: User) -> CreateRequestOut:
         try:
             token_data = UrlSerializer.decode_url_safe_token(token)
             user_email = token_data["email"]
@@ -78,8 +81,15 @@ class RequestService:
         
         return request
 
-    async def get_request_by_id(self, request_id: int):
+    async def get_request_by_id(self, request_id: int) -> CreateRequestOut:
         request = await self.repository.get_request_by_id(request_id)
         if request is None:
             raise RequestNotFound(info={"error": "This request wasnt found in DB", "data":f"Request id: {request_id}"})
         return request
+    
+    async def get_requests_for_user(self, user_id: int) -> List[CreateRequestOut]:
+        user = await self._userService.get_user_by_id(user_id)
+
+        requests = await self.repository.get_requests_for_user(user_id)
+
+         
