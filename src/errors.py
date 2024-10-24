@@ -52,7 +52,16 @@ class RequestCheckNotAllowed(SomeKindOfException):
 
 class RequestNotFound(SomeKindOfException):
     """Request not found"""
-    
+
+class RequestStatusNotFound(SomeKindOfException):
+    """No status have been found with this name"""
+
+class ValidateRequestNotAllowed(SomeKindOfException):
+    """The user cant validate this request"""
+
+class TokenVerificationEmailNotMatch(SomeKindOfException):
+    """The current user dont match the token verification user """
+
 def create_exception_handler(status_code:int, initial_details:Any) -> Callable[[Request, Exception], JSONResponse]:
     async def exception_handler(request: Request, exception: SomeKindOfException):
         return JSONResponse(
@@ -226,6 +235,39 @@ def register_errors(app:FastAPI):
             initial_details={
                 "message": RequestNotFound.__doc__,
                 "error_code":"request_not_found"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        RequestStatusNotFound,
+        create_exception_handler(
+            status_code=status.HTTP_404_NOT_FOUND,
+            initial_details={
+                "message": RequestStatusNotFound.__doc__,
+                "error_code":"request_status_not_found"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        ValidateRequestNotAllowed,
+        create_exception_handler(
+            status_code=status.HTTP_403_FORBIDDEN,
+            initial_details={
+                "message": ValidateRequestNotAllowed.__doc__,
+                "error_code":"validate_request_not_allowed"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        TokenVerificationEmailNotMatch,
+        create_exception_handler(
+            status_code=status.HTTP_403_FORBIDDEN,
+            initial_details={
+                "message": TokenVerificationEmailNotMatch.__doc__,
+                "error_code":"token_verification_email_not_match"
             }
         )
     )

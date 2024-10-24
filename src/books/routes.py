@@ -32,6 +32,11 @@ async def create_book(
     _service = BookService(session)
     return await _service.create_book(book_data, current_user)
 
+@books_router.get("/{token}", status_code=status.HTTP_200_OK, response_model=BookModelOut, dependencies=[access_token_bearer])
+async def get_book_from_token(token: str, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
+    _service = BookService(session)
+    return await _service.get_book_from_token(token, current_user)
+
 @books_router.get("/{book_id}", status_code=status.HTTP_200_OK, response_model=BookModelOut, dependencies=[access_token_bearer])
 async def get_book_by_id(book_id: int, session: AsyncSession = Depends(get_session)):
     _service = BookService(session)

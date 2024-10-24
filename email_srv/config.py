@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     password_reset_request_mail_subject: str
     verified_mail_subject: str
     update_request_mail_subject: str
+    validate_request_mail_subject: str
+
     model_config= SettingsConfigDict(env_file=".env")
 
 settings = Settings()

@@ -4,8 +4,8 @@ from src.books.repository import BookRepository
 from src.books.schemas import BookCreateModel, BookCreatedModel, BookModelOut
 from src.db.models import Book, User
 from src.enums import Role
-from src.errors import BookNotFound, UpdateNotAllowed
-
+from src.errors import BookNotFound, TokenVerificationEmailNotMatch, UpdateNotAllowed, UserVerificationFailed
+from src.auth.utils import UrlSerializer
 
 class BookService:
     def __init__(self, session: AsyncSession):
@@ -39,3 +39,20 @@ class BookService:
     async def delete_book(self, book_id: int):
         book_to_delete = await self.get_book_by_id(book_id)
         return await self.repository.delete_book(book_to_delete)
+    
+    async def get_book_from_token(self, token: str, current_user: User) -> BookModelOut:
+        try:
+            token_data = UrlSerializer.decode_url_safe_token(token)
+            user_email = token_data.get("email")
+            book_id = token_data.get("book_id")
+        except Exception:
+            raise UserVerificationFailed(info={"error": "Can't access data from token verification"})
+        
+        if current_user.email != user_email:
+            raise TokenVerificationEmailNotMatch(info={"error": "This book dont belong to the current_user", "data":f"Book owner email: {user_email}"})
+        
+        book = await self.get_book_by_id(book_id)
+
+        return book
+        
+        

@@ -4,6 +4,8 @@ from pydantic import EmailStr
 from sqlalchemy import Column
 from sqlmodel import Field, Relationship, SQLModel
 import sqlalchemy.dialects.postgresql as pg
+from src.enums import RequestStatus
+
 class CulturalProductBase(SQLModel):
     name: str = Field(index=True)
     published_date: date
@@ -52,3 +54,4 @@ class Request(SQLModel, table=True):
     book_id: Optional[int] = Field(default=None, foreign_key="books.id")
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP,default=datetime.now))
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP,default=datetime.now))
+    status: str

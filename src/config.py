@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     password_reset_request_mail_subject: str
     routing_key: str
     update_request_mail_subject: str
-
+    validate_request_mail_subject: str
     model_config= SettingsConfigDict(env_file=".env")
 
 settings = Settings()

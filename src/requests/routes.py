@@ -6,7 +6,7 @@ from src.db import get_session
 from src.db.models import User
 from src.dependencies import RoleChecker, get_current_user
 from src.enums import Role
-from src.requests.schemas import CreateRequestOut
+from src.requests.schemas import CreateRequest, CreateRequestOut, UpdateRequest
 from src.requests.service import RequestService
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -26,9 +26,9 @@ async def check_request_from_mail(token:str, session: AsyncSession = Depends(get
     return request
 
 @requests_router.get("/user/{user_id}", status_code=status.HTTP_200_OK, response_model=List[CreateRequestOut], dependencies=[content_creator_role_checker])
-async def get_all_user_request(user_id: int, session: AsyncSession = Depends(get_session)):
+async def get_all_user_request(user_id: int, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
     _service = RequestService(session)
-    requests = await _service.get_requests_for_user(user_id)
+    requests = await _service.get_requests_for_user(user_id, current_user)
     return requests
 
 @requests_router.get("/", status_code=status.HTTP_200_OK, response_model=List[CreateRequestOut], dependencies=[admin_role_checker])
@@ -40,3 +40,9 @@ async def get_all_requests(limit: Annotated[int, Query(gt=0,le=100)] = 10, offse
 async def validate_request(request_id: int, session: AsyncSession = Depends(get_session), current_user:User = Depends(get_current_user)):
     _service = RequestService(session)
     return await _service.validate_request(request_id, current_user)
+
+@requests_router.patch("/{request_id}", status_code=status.HTTP_200_OK, response_model=CreateRequestOut, dependencies=[content_creator_role_checker])
+async def update_request(request_id: int, request_data: UpdateRequest, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
+    _service = RequestService(session)
+    return await _service.update_request(request_id, request_data, current_user)
+

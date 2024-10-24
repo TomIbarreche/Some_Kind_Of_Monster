@@ -11,3 +11,17 @@ class Role(Enum):
             to_list.append(data.value)
 
         return to_list
+    
+class RequestStatus(Enum):
+    CREATED = "created"
+    PENDING = "pending"
+    VALIDATED = "validated"
+    CANCELLED ="cancelled"
+    REFUSED = "refused"
+
+    def __to_list__(self):
+        to_list = []
+        for data in RequestStatus:
+            to_list.append(data.value)
+
+        return to_list

@@ -25,4 +25,9 @@ class RequestRepository:
         requests = result.unique().all()
         return requests
     
-    
+    async def update_request(self, request: Request, request_data_dict: dict):
+        for k,v in request_data_dict.items():
+            setattr(request, k,v)
+
+        await self.session.commit()
+        return request
