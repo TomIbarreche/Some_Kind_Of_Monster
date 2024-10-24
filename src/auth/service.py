@@ -12,7 +12,6 @@ from src.db.models import User
 from src.auth.utils import Hasher, TokenMaker, UrlSerializer
 from src.enums import Role
 from src.config import settings
-from src.mail import mail, create_message
 
 connection_parameters = pika.ConnectionParameters('localhost')
 

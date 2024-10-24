@@ -1,3 +1,4 @@
+from datetime import datetime
 import time
 from typing import List
 from fastapi import Depends
@@ -6,7 +7,8 @@ import pika.spec
 from sqlmodel.ext.asyncio.session import AsyncSession
 import requests
 from src.auth.service import UserService
-from src.books.schemas import BookCreateModel
+from src.books.schemas import BookCreateModel, BookModelOut
+from src.books.service import BookService
 from src.db.models import Request, User
 from src.mail import create_message
 from src.errors import RequestNotFound, UpdateRequestNotAllowed, UserVerificationFailed, RequestCheckNotAllowed
@@ -24,6 +26,7 @@ class RequestService:
     def __init__(self, session: AsyncSession):
         self.repository = RequestRepository(session)
         self._userService = UserService(session)
+        self._bookService = BookService(session)
 
     def connect_to_rabbitmq(self):
         while True:
@@ -89,7 +92,21 @@ class RequestService:
     
     async def get_requests_for_user(self, user_id: int) -> List[CreateRequestOut]:
         user = await self._userService.get_user_by_id(user_id)
+        return user.requests
 
-        requests = await self.repository.get_requests_for_user(user_id)
+    async def get_all_requests(self, limit: int, offset: int) -> List[CreateRequestOut]:
+        return await self.repository.get_all_requests(limit, offset)
 
-         
+    async def validate_request(self, request_id: int, current_user: User)-> BookModelOut:
+        request = await self.get_request_by_id(request_id)
+        if request.owner_id != current_user.id:
+            raise UpdateRequestNotAllowed(info={"error": "This request dont belong to the current_user", "data":f"Request owner id: {request.owner_id}"})
+
+        book_to_update = await self._bookService.get_book_by_id(request.book_id)
+        updated_book_data_dict = json.loads(request.book_update_data)
+        date = datetime.strptime(updated_book_data_dict["published_date"], "%Y-%d-%m").date()
+        updated_book_data_dict["published_date"] = date
+        updated_book= await self._bookService.repository.update_book(book_to_update, updated_book_data_dict)
+        return updated_book
+
+    

@@ -8,7 +8,6 @@ class RequestRepository:
         self.session = session
 
     async def create_book_update_request(self,new_request: Request):
-        
         self.session.add(new_request)
         await self.session.commit()
         await self.session.refresh(new_request)
@@ -19,3 +18,11 @@ class RequestRepository:
         result = await self.session.exec(statement)
         request = result.first()
         return request
+    
+    async def get_all_requests(self, limit: int, offset: int):
+        statement = select(Request).limit(limit).offset(offset).order_by(Request.created_at)
+        result = await self.session.exec(statement)
+        requests = result.unique().all()
+        return requests
+    
+    

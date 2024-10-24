@@ -1,5 +1,5 @@
-from typing import List
-from fastapi import Depends, APIRouter, status
+from typing import Annotated, List
+from fastapi import Depends, APIRouter, Query, status
 from src.books.schemas import BookCreateModel, BookCreatedModel, BookModelOut
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.db import get_session
@@ -16,8 +16,8 @@ access_token_bearer = Depends(TokenAccessBearer())
 
 async def get_all_books(
     search: str = "",
-    limit:int=10,
-    offset:int=0,
+    limit: Annotated[int, Query(gt=0,le=100)] = 10,
+    offset: Annotated[int, Query(gt=-1, le=100)]=0,
     session: AsyncSession = Depends(get_session),
 ):
     _service = BookService(session)

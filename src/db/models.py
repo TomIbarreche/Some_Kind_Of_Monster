@@ -1,9 +1,9 @@
 from datetime import date, datetime
+from typing import Optional
 from pydantic import EmailStr
 from sqlalchemy import Column
 from sqlmodel import Field, Relationship, SQLModel
 import sqlalchemy.dialects.postgresql as pg
-
 class CulturalProductBase(SQLModel):
     name: str = Field(index=True)
     published_date: date
@@ -39,11 +39,16 @@ class User(SQLModel, table=True):
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP,default=datetime.now))
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP,default=datetime.now))
     books: list["Book"] = Relationship(back_populates="users", link_model=UserBookLink, sa_relationship_kwargs={'lazy': 'joined'})
+    requests: list["Request"] = Relationship(sa_relationship_kwargs={"primaryjoin":"User.id==Request.owner_id", "lazy":"joined"})
 
 class Request(SQLModel, table=True):
     __tablename__="requests"
     id: int = Field(default=None, primary_key=True)
-    requester_id: int | None = Field(default=None, foreign_key="users.id")
+    owner_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    owner: User = Relationship(sa_relationship_kwargs={"primaryjoin": "Request.owner_id==User.id", "lazy":"joined"})
+    requester_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    requester: User = Relationship(sa_relationship_kwargs={"primaryjoin": "Request.requester_id==User.id", "lazy":"joined"})
     book_update_data: str
-    owner_id: int | None = Field(default=None, foreign_key="users.id")
-    book_id: int | None = Field(default=None, foreign_key="books.id")
+    book_id: Optional[int] = Field(default=None, foreign_key="books.id")
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP,default=datetime.now))
+    updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP,default=datetime.now))

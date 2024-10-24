@@ -1,5 +1,5 @@
-from typing import List
-from fastapi import APIRouter, Depends,status, BackgroundTasks
+from typing import Annotated, List
+from fastapi import APIRouter, Depends, Path, Query,status, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.security import  OAuth2PasswordBearer
 from src.auth.schemas import PasswordResetRequest, PasswordResetConfirm, UserCreationModel, UserLoginModel, UserOutModel, UserOutModelWithBooks, UserUpdateModel, UserUpdateRoleModel
@@ -17,7 +17,7 @@ access_token_bearer = Depends(TokenAccessBearer())
 admin_role_checker =  Depends(RoleChecker([Role.ADMIN.value]))
 
 @auth_router.post("/signup", status_code=status.HTTP_201_CREATED)
-async def create_user(user_data: UserCreationModel,bg_task: BackgroundTasks, session: AsyncSession = Depends(get_session), ):
+async def create_user(user_data: UserCreationModel,bg_task: BackgroundTasks, session: AsyncSession = Depends(get_session)):
     _service = UserService(session)
     new_user = await _service.create_user(user_data, bg_task)
     return {
@@ -35,7 +35,7 @@ async def get_current_user(user: User = Depends(get_current_user)):
     return user
 
 @auth_router.get("/all", status_code=status.HTTP_200_OK, response_model=List[UserOutModelWithBooks], dependencies=[admin_role_checker, access_token_bearer])
-async def get_all_users(session: AsyncSession = Depends(get_session), search: str ="", limit: int = 10, offset: int = 0):
+async def get_all_users(session: AsyncSession = Depends(get_session), search: str ="",limit: Annotated[int, Query(gt=0,le=100)] = 10, offset: Annotated[int, Query(gt=-1, le=100)]=0):
     _service = UserService(session)
     return await _service.get_all_users(search, limit, offset)
 
