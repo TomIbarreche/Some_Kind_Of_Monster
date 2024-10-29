@@ -1,10 +1,12 @@
+from sqlalchemy import Column, Integer, String
+from pydantic import EmailStr
+from sqlalchemy.ext.declarative import declarative_base
 from datetime import date, datetime
 from typing import Optional
 from pydantic import EmailStr
 from sqlalchemy import Column
 from sqlmodel import Field, Relationship, SQLModel
 import sqlalchemy.dialects.postgresql as pg
-from src.enums import RequestStatus
 
 class CulturalProductBase(SQLModel):
     name: str = Field(index=True)

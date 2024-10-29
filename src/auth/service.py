@@ -29,7 +29,7 @@ class UserService:
                 print("Failed to connect to RabbitMq. Retrying in 5seconds...")
                 time.sleep(5)
 
-    async def create_user(self, user_data: UserCreationModel, bg_task: BackgroundTasks) -> NewCreatedUserModel:
+    async def create_user(self, user_data: UserCreationModel) -> NewCreatedUserModel:
         if not await self.check_if_user_exists(user_data):
             connection = self.connect_to_rabbitmq()
             channel = connection.channel()

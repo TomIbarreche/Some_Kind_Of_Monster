@@ -27,9 +27,3 @@ app = FastAPI(
 
 registered_routers(app)
 register_errors(app)
-
-
-
-
-
-
