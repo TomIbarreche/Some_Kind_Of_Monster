@@ -23,7 +23,6 @@ async def get_current_user(token_details: dict = Depends(TokenAccessBearer()), s
     user_email = token_details["email"]
     _user_service = UserService(session)
     current_user = await _user_service.get_user_by_email(user_email=user_email)
-    
     return current_user
 
 class RoleChecker:

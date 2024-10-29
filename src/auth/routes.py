@@ -16,11 +16,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 access_token_bearer = Depends(TokenAccessBearer())
 admin_role_checker =  Depends(RoleChecker([Role.ADMIN.value]))
 
-
-@auth_router.get("/ping")
-async def pong():
-    return {"ping":"pong!"}
-
 @auth_router.post("/signup", status_code=status.HTTP_201_CREATED)
 async def create_user(user_data: UserCreationModel, session: AsyncSession = Depends(get_session)):
     _service = UserService(session)

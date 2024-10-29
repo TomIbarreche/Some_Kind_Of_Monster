@@ -31,8 +31,7 @@ class UserService:
 
     async def create_user(self, user_data: UserCreationModel) -> NewCreatedUserModel:
         if not await self.check_if_user_exists(user_data):
-            connection = self.connect_to_rabbitmq()
-            channel = connection.channel()
+            
             user_data_dict = user_data.model_dump(exclude_none=True)
             new_user = User(**user_data_dict)
             new_user.password_hash = Hasher.hash_password(user_data_dict['password'])
@@ -45,6 +44,8 @@ class UserService:
             message_data_dict["token"] = token
             message_data = json.dumps(message_data_dict)
             try:
+                connection = self.connect_to_rabbitmq()
+                channel = connection.channel()
                 channel.queue_declare(queue=settings.routing_key, durable=True)
                 channel.basic_publish(exchange="", routing_key=settings.routing_key, body=message_data, properties=pika.BasicProperties(delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE))
             except Exception as err:

@@ -1,7 +1,24 @@
 import json
 import pytest
 from src.auth.repository import UserRepository
+from src.auth.service import UserService
 from src.db.models import User
+from src.auth.utils import Hasher
+
+# fake_user_dict = {
+#             "id": 3,
+#             "first_name": "Fake",
+#             "date_of_birth": "1993-10-12",
+#             "created_at": "2024-10-29T12:06:38.591628",
+#             "email": "fake@fake.fake",
+#             "username": "Fake",
+#             "last_name": "Faky",
+#             "is_verified": False,
+#             "role": "user",
+#             "password_hash": Hasher.hash_password("ffffffff"),
+#             "updated_at": "2024-10-29T12:06:38.591628"
+#         }
+# fake_user = User(**fake_user_dict)
 
 def test_create_user(test_app, monkeypatch):
     test_request_payload= { 
@@ -166,3 +183,115 @@ def test_create_user_with_payload_errors(test_app, monkeypatch, payload, err_sta
     monkeypatch.setattr(UserRepository, "check_if_user_exists", mock_get)
     response = test_app.post("/api/v1/auth/signup", content=json.dumps(payload))
     assert response.status_code == err_status_code
+
+
+def test_log_user(test_app, monkeypatch):
+    async def mock_get(self,user_email):
+        return_data = {
+            "id": 3,
+            "first_name": "Fake",
+            "date_of_birth": "1993-10-12",
+            "created_at": "2024-10-29T12:06:38.591628",
+            "email": "fake@fake.fake",
+            "username": "Fake",
+            "last_name": "Faky",
+            "is_verified": True,
+            "role": "admin",
+            "password_hash": Hasher.hash_password("ffffffff"),
+            "updated_at": "2024-10-29T12:06:38.591628"
+        }
+        user = User(**return_data)
+        return user
+    
+    monkeypatch.setattr(UserRepository, "get_user_by_email", mock_get)
+   
+    payload_data= {
+        "email": "fake@fake.fake",
+        "password":"ffffffff"
+    }
+    response = test_app.post("/api/v1/auth/login", content=json.dumps(payload_data))
+    assert response.status_code == 200
+    assert response.json()["message"] == "Login Successfull"
+    assert response.json()["user"] == {"id":3,"username":"Fake","email":"fake@fake.fake"}
+    return response.json()["access_token_bearer"]
+        
+@pytest.mark.parametrize(
+    "user, password, err_status_code, err_msg, err_code",
+    [
+        [None, "ffffffff", 404, "The user with this email doesnt exists", "user_not_found"],
+        ["test_user", "wrongPassword",  404, "Unable to login user with those credentials", "invalid_credentials"],
+        ["test_user","ffffffff",403, "The user is trying to login but need to verified his email first", "user_not_verified"]
+    ]
+)
+def test_log_user_with_errors(test_app, monkeypatch, user, password, err_status_code, err_msg, err_code, request):
+    if user is not None:
+        user = request.getfixturevalue(user)
+    async def mock_get(self,user_email):
+        return user
+    
+    monkeypatch.setattr(UserRepository, "get_user_by_email", mock_get)
+
+    payload_data= {
+        "email": "fake@fake.fake",
+        "password":password
+    }
+    response = test_app.post("/api/v1/auth/login", content=json.dumps(payload_data))
+    assert response.status_code == err_status_code
+    assert response.json()["info"]["error"] == err_msg
+    assert response.json()["initial_details"]["error_code"] == err_code
+
+def test_get_all_user(test_app, monkeypatch):
+    test_data = [
+        {
+            "id": 1,
+            "username": "Admin",
+            "first_name": "Admin",
+            "last_name": "Admin",
+            "date_of_birth": "2020-01-01",
+            "email": "ibarreche666@gmail.com",
+            "role": "admin",
+            "books": []
+        },
+        {
+            "id": 6,
+            "username": "bbb",
+            "first_name": "TomB",
+            "last_name": "Ibarreche",
+            "date_of_birth": "1993-10-12",
+            "email": "de@hotmail.fr",
+            "role": "user",
+            "books": []
+        }
+    ]
+
+    fake_admin_dict = {
+            "id": 3,
+            "first_name": "Fake",
+            "date_of_birth": "1993-10-12",
+            "created_at": "2024-10-29T12:06:38.591628",
+            "email": "fa@fa.fa",
+            "username": "Fake",
+            "last_name": "Faky",
+            "is_verified": False,
+            "role": "admin",
+            "password_hash": Hasher.hash_password("ffffffff"),
+            "updated_at": "2024-10-29T12:06:38.591628"
+        }
+    fake_admin = User(**fake_admin_dict)
+
+    async def mock_get(self,user_email):
+        return fake_admin
+    
+    monkeypatch.setattr(UserRepository, "get_user_by_email", mock_get)
+
+    async def mock_get_all(self, search, limit, offset):
+        return test_data
+    
+    monkeypatch.setattr(UserRepository, "get_all_users", mock_get_all)
+    token = test_log_user(test_app, monkeypatch)
+    response = test_app.get("/api/v1/auth/all",headers={"Authorization":f"Bearer {token}"})
+    print(response.content)
+    assert response.status_code == 200
+    
+
+

@@ -102,7 +102,7 @@ def register_errors(app:FastAPI):
             status_code=status.HTTP_404_NOT_FOUND,
             initial_details={
                 "message": InvalidCredentials.__doc__,
-                "error_code":"user_not_found"
+                "error_code":"invalid_credentials"
             }
         )
     )
