@@ -9,50 +9,24 @@ from src.auth.schemas import NewCreatedUserModel, PasswordResetConfirm, Password
 from src.books.service import BookService
 from src.errors import UpdateNotAllowed, UserAlreadyExists, UserNotFound, InvalidCredentials, UserNotVerified, RoleNotFound, UserVerificationFailed, ResetPasswordDontMatch
 from src.db.models import User
-from src.auth.utils import Hasher, TokenMaker, UrlSerializer
+from src.auth.utils import Hasher, TokenMaker, UrlSerializer, create_message
 from src.enums import Role
 from src.config import settings
 
-connection_parameters = pika.ConnectionParameters('localhost')
 
 class UserService:
     def __init__(self, session: AsyncSession):
         self.repository = UserRepository(session)
         self.book_service = BookService(session)
 
-    def connect_to_rabbitmq(self):
-        while True:
-            try:
-                connection = pika.BlockingConnection(connection_parameters)
-                return connection
-            except pika.exceptions.AMQPConnectionError:
-                print("Failed to connect to RabbitMq. Retrying in 5seconds...")
-                time.sleep(5)
-
     async def create_user(self, user_data: UserCreationModel) -> NewCreatedUserModel:
         if not await self.check_if_user_exists(user_data):
-            
             user_data_dict = user_data.model_dump(exclude_none=True)
             new_user = User(**user_data_dict)
             new_user.password_hash = Hasher.hash_password(user_data_dict['password'])
             new_user.role = Role.USER.value
-            message_data_dict = {}
             new_added_user = await self.repository.create_user(new_user)
-            message_data_dict["mail"] = new_added_user.email
-            message_data_dict["subject"] = settings.verified_mail_subject
-            token = UrlSerializer.create_url_safe_token({"email":new_added_user.email})
-            message_data_dict["token"] = token
-            message_data = json.dumps(message_data_dict)
-            try:
-                connection = self.connect_to_rabbitmq()
-                channel = connection.channel()
-                channel.queue_declare(queue=settings.routing_key, durable=True)
-                channel.basic_publish(exchange="", routing_key=settings.routing_key, body=message_data, properties=pika.BasicProperties(delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE))
-            except Exception as err:
-                print(f"Failed to publish message: {err}")
-            finally:
-                channel.close()
-                connection.close()
+            create_message(new_added_user.email, settings.verified_mail_subject)
             return new_added_user
     
     async def create_default_admin(self) -> None:
@@ -182,24 +156,9 @@ class UserService:
         if user_to_update:
             user_to_update = await self.repository.update_user(user_to_update, {"is_verified":True})
 
-    async def password_reset_request(self, user_email: PasswordResetRequest, bg_task: BackgroundTasks):
-        connection = self.connect_to_rabbitmq()
-        channel = connection.channel()
-        message_data_dict = {}
+    async def password_reset_request(self, user_email: PasswordResetRequest):
         email = user_email.email
-        message_data_dict["mail"] = email
-        token = UrlSerializer.create_url_safe_token({"email": email})
-        message_data_dict["token"] = token
-        message_data_dict["subject"] = settings.password_reset_request_mail_subject
-        message_data = json.dumps(message_data_dict)
-        try:
-            channel.queue_declare(queue=settings.routing_key, durable=True)
-            channel.basic_publish(exchange="", routing_key=settings.routing_key, body=message_data, properties=pika.BasicProperties(delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE))
-        except Exception as err:
-            print(f"Failed to publish message: {err}")
-        finally:
-            channel.close()
-            connection.close()
+        create_message(email, settings.password_reset_request_mail_subject)
 
     async def password_reset_confirm(self, token :str, password_data: PasswordResetConfirm):
         try:

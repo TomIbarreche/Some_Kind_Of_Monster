@@ -75,9 +75,9 @@ async def verify_user(token: str, session: AsyncSession = Depends(get_session)):
     )
 
 @auth_router.post("/password_reset_request")
-async def password_reset_request(email: PasswordResetRequest, bg_task: BackgroundTasks, session: AsyncSession = Depends(get_session)):
+async def password_reset_request(email: PasswordResetRequest, session: AsyncSession = Depends(get_session)):
     _service = UserService(session)
-    await _service.password_reset_request(email, bg_task)
+    await _service.password_reset_request(email)
     return {
         "message":"Check your emails to reset your password"
     }
