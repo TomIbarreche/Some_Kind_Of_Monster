@@ -1,9 +1,10 @@
 from typing import List
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlmodel import Session
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.auth.service import UserService
-from src.db import get_session
+from src.db import get_db
 from src.db.models import User
 from .auth.utils import TokenMaker
 from src.enums import Role
@@ -19,7 +20,7 @@ class TokenAccessBearer(HTTPBearer):
         token_data = TokenMaker.decode_jwt_token(token)
         return token_data
     
-async def get_current_user(token_details: dict = Depends(TokenAccessBearer()), session: AsyncSession = Depends(get_session)):
+async def get_current_user(token_details: dict = Depends(TokenAccessBearer()), session: Session = Depends(get_db)):
     user_email = token_details["email"]
     _user_service = UserService(session)
     current_user = await _user_service.get_user_by_email(user_email=user_email)
@@ -34,5 +35,5 @@ class RoleChecker:
         if current_user.role in self.allowed_roles_list:
             return True
     
-        raise InsufficientPermission(info={"issue":f"Roles {self.allowed_roles_list} are required", "data":f"Role '{current_user.role}' found"})
+        raise InsufficientPermission(info={"error":f"Roles {self.allowed_roles_list} are required", "data":f"Role '{current_user.role}' found"})
     

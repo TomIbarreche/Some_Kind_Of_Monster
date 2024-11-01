@@ -1,14 +1,40 @@
 import json
 import pytest
+from sqlmodel import create_engine, SQLModel
 from starlette.testclient import TestClient
-from src.auth.utils import Hasher
+from src.auth.utils import Hasher, UrlSerializer
+from src.db import get_db
 from src.db.models import User
 from src.main import app
+from sqlmodel import create_engine, Session
+from src.config import settings
 
-@pytest.fixture(scope="module")
-def test_app():
-    client = TestClient(app)
-    yield client
+@pytest.fixture(name="session")
+def session_fixture():
+    from src.auth.service import UserService
+    engine = create_engine("postgresql+psycopg2://postgres:The_Bioshock_Within@localhost:5432/Trantor_test")
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        user_service = UserService(session)
+        if user_service.check_if_admin_exists() == False:
+            print("No default admin found. Lets create one")
+            user_service.create_default_admin()
+        yield session
+
+    SQLModel.metadata.drop_all(engine)
+
+
+@pytest.fixture(name="client")  
+def client_fixture(session: Session):  
+
+    def get_db_override(): 
+        return session
+
+    app.dependency_overrides[get_db] = get_db_override  
+    client = TestClient(app)  
+    yield client  
+    app.dependency_overrides.clear()  
+    
 
 @pytest.fixture(scope="module")
 def not_verified_fake_user():
@@ -45,6 +71,23 @@ def verified_fake_user():
     return User(**fake_user_dict)
 
 @pytest.fixture(scope="module")
+def verified_fake_user_with_new_password():
+    fake_user_dict = {
+            "id": 3,
+            "first_name": "Fake",
+            "date_of_birth": "1993-10-12",
+            "created_at": "2024-10-29T12:06:38.591628",
+            "email": "fake@fake.fake",
+            "username": "Fake",
+            "last_name": "Faky",
+            "is_verified": True,
+            "role": "user",
+            "password_hash": Hasher.hash_password("aaaaaaaa"),
+            "updated_at": "2024-10-29T12:06:38.591628"
+        }
+    return User(**fake_user_dict)
+
+@pytest.fixture(scope="module")
 def fake_created_user():
     fake_created_user_dict = {
             "id": 3,
@@ -60,13 +103,26 @@ def fake_created_user():
         }
     return User(**fake_created_user_dict)
 
+
+
 @pytest.fixture(scope="module")
 def fake_user_signup_data():
     return {
         "username":"hotmail",
-        "email": "ibarreche.tom@hotmail.fr",
+        "email": "fake@fake.fake",
         "password":"ffffffff",
         "first_name":"TomB",
+        "last_name":"Ibarreche",
+        "date_of_birth":"1993-10-12"
+    }
+
+@pytest.fixture(scope="module")
+def fake_user_update_data():
+    return {
+        "username":"Kelso",
+        "email": "fake@fake.fake",
+        "password":"ffffffff",
+        "first_name":"Coin",
         "last_name":"Ibarreche",
         "date_of_birth":"1993-10-12"
     }
@@ -89,27 +145,28 @@ def fake_admin():
     return User(**fake_user_dict)
 
 @pytest.fixture(scope="function")
-def log_admin(test_app,fake_admin, monkeypatch):
+def log_admin(client,fake_admin, monkeypatch):
     from src.auth.repository import UserRepository
 
-    async def mock_get(self,user_email):
+    def mock_get(self,user_email):
         return fake_admin
     
+
     monkeypatch.setattr(UserRepository, "get_user_by_email", mock_get)
    
     payload_data= {
         "email": "admin@admin.admin",
         "password":"ffffffff"
     }
-    response = test_app.post("/api/v1/auth/login", content=json.dumps(payload_data))
+    response = client.post("/api/v1/auth/login", content=json.dumps(payload_data))
     return response.json()["access_token_bearer"]
 
 
 @pytest.fixture(scope="function")
-def log_user(test_app,verified_fake_user, monkeypatch):
+def log_user(client,verified_fake_user, monkeypatch):
     from src.auth.repository import UserRepository
 
-    async def mock_get(self,user_email):
+    def mock_get(self,user_email):
         return verified_fake_user
     
     monkeypatch.setattr(UserRepository, "get_user_by_email", mock_get)
@@ -118,7 +175,7 @@ def log_user(test_app,verified_fake_user, monkeypatch):
         "email": "fake@fake.fake",
         "password":"ffffffff"
     }
-    response = test_app.post("/api/v1/auth/login", content=json.dumps(payload_data))
+    response = client.post("/api/v1/auth/login", content=json.dumps(payload_data))
     return response.json()["access_token_bearer"]
 
 @pytest.fixture(scope="function")
@@ -135,13 +192,23 @@ def fake_user_list():
             "books": []
         },
         {
-            "id": 6,
-            "username": "bbb",
-            "first_name": "TomB",
-            "last_name": "Ibarreche",
+            "id": 2,
+            "username": "Fake",
+            "first_name": "Fake",
+            "last_name": "Faky",
             "date_of_birth": "1993-10-12",
-            "email": "de@hotmail.fr",
+            "email": "fake@fake.fake",
             "role": "user",
+            "books": []
+        },
+        {
+            "id": 3,
+            "username": "ContentDude",
+            "first_name": "Fake",
+            "last_name": "Faky",
+            "date_of_birth": "1993-10-12",
+            "email": "content@content.content",
+            "role": "content_creator",
             "books": []
         }
     ]
@@ -153,3 +220,45 @@ def expired_token():
 @pytest.fixture(scope="module")
 def failed_signature_token():
     return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.FpbCI6ImliYXJyZWNoZS50b21AaG90bWFpbC5mciIsInVzZXJfaWQiOjI2LCJ1c2VyX3JvbGUiOiJjb250ZW50X2NyZWF0b3IiLCJleHAiOjE3Mjk3ODU3OTJ9.IC4T_lTwOIva20IHHCsgEF2ypEhZyAzPFdAmap6oKbU"
+
+
+@pytest.fixture(scope="module")
+def verify_token():
+    token = UrlSerializer.create_url_safe_token({"email":"fake@fake.fake"})
+    return token
+ 
+@pytest.fixture(scope="module")
+def valid_password_data():
+    return {
+        "new_password":"aaaaaaaa",
+        "confirm_password":"aaaaaaaa"
+    }
+
+@pytest.fixture(scope="module")
+def invalid_password_data():
+    return {
+        "new_password":"aaaaaaaa",
+        "confirm_password":"bbbbbbbb"
+    }
+
+@pytest.fixture(scope="module")
+def signup_data():
+    return {
+        "email":"fake@fake.fake",
+        "password":"ffffffff"
+    }
+
+@pytest.fixture(scope="function")
+def create_verify_connect_standard_user(client,fake_user_signup_data, signup_data, verify_token):
+    client.post("/api/v1/auth/signup", json=fake_user_signup_data)
+    token = verify_token
+    client.get(f"/api/v1/auth/verify/{token}")
+    log_user = client.post("/api/v1/auth/login", json=signup_data)
+    access_token = log_user.json()["access_token_bearer"]
+    return access_token
+
+@pytest.fixture(scope="function")
+def connect_admin(client):
+    log_admin = client.post("/api/v1/auth/login", json={"email":settings.default_admin_email, "password": settings.default_admin_password})
+    admin_access_token = log_admin.json()["access_token_bearer"]
+    return admin_access_token

@@ -3,19 +3,20 @@ import json
 from typing import List
 from fastapi.responses import JSONResponse
 from fastapi import status, BackgroundTasks
+from sqlmodel import Session
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.auth.repository import UserRepository
 from src.auth.schemas import NewCreatedUserModel, PasswordResetConfirm, PasswordResetRequest, UserCreationModel, UserLoginModel, UserOutModel, UserOutModelWithBooks, UserUpdateModel
 from src.books.service import BookService
 from src.errors import UpdateNotAllowed, UserAlreadyExists, UserNotFound, InvalidCredentials, UserNotVerified, RoleNotFound, UserVerificationFailed, ResetPasswordDontMatch
 from src.db.models import User
-from src.auth.utils import Hasher, TokenMaker, UrlSerializer, create_message
+from src.auth.utils import Hasher, TokenMaker, UrlSerializer, MailSender
 from src.enums import Role
 from src.config import settings
 
 
 class UserService:
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: Session):
         self.repository = UserRepository(session)
         self.book_service = BookService(session)
 
@@ -25,11 +26,11 @@ class UserService:
             new_user = User(**user_data_dict)
             new_user.password_hash = Hasher.hash_password(user_data_dict['password'])
             new_user.role = Role.USER.value
-            new_added_user = await self.repository.create_user(new_user)
-            create_message(new_added_user.email, settings.verified_mail_subject)
+            new_added_user = self.repository.create_user(new_user)
+            MailSender.create_message(new_added_user.email, settings.verified_mail_subject)
             return new_added_user
     
-    async def create_default_admin(self) -> None:
+    def create_default_admin(self) -> None:
         admin_data_dict = {
             "username": settings.default_admin_username,
             "password":settings.default_admin_password,
@@ -42,13 +43,13 @@ class UserService:
         admin = User(**admin_data_dict)
         admin.password_hash = Hasher.hash_password(admin_data_dict['password'])
         admin.role = Role.ADMIN.value
-        await self.repository.create_user(admin)
+        self.repository.create_user(admin)
 
-    async def check_if_admin_exists(self) -> bool:
-        return await self.repository.check_if_admin_exists()
+    def check_if_admin_exists(self) -> bool:
+        return self.repository.check_if_admin_exists()
     
     async def check_if_user_exists(self, user_data: dict) -> bool:
-        user_exists_by_mail, user_exists_by_username = await self.repository.check_if_user_exists(user_data)
+        user_exists_by_mail, user_exists_by_username = self.repository.check_if_user_exists(user_data)
         if user_exists_by_mail:
             raise UserAlreadyExists(info={"error": "This email is already registered by an other user", "data":f"Email: {user_data.email}"})
         
@@ -58,7 +59,7 @@ class UserService:
         return False
         
     async def log_user(self, user_data: UserLoginModel):
-        user = await self.repository.get_user_by_email(user_data.email)
+        user = self.repository.get_user_by_email(user_data.email)
         if user is None:
             raise UserNotFound(info={"error": "The user with this email doesnt exists", "data":f"User email: {user_data.email}"})
         
@@ -84,17 +85,17 @@ class UserService:
             raise UserNotVerified(info={"error": "The user is trying to login but need to verified his email first", "data":f"User: {user.username}. Email to verified: {user.email}"})
 
     async def get_user_by_email(self, user_email:str) -> UserOutModel:
-        user = await self.repository.get_user_by_email(user_email)
+        user = self.repository.get_user_by_email(user_email)
         if user is None:
             raise UserNotFound(info={"error": "The user with this email doesnt exists", "data":f"User email: {user_email}"})
         return user
         
     async def get_all_users(self, search: str, limit: int, offset: int) -> List[UserOutModelWithBooks]:
-        users = await self.repository.get_all_users(search, limit, offset)
+        users = self.repository.get_all_users(search, limit, offset)
         return users
     
     async def get_user_by_id(self, user_id: int)-> UserOutModelWithBooks:
-        user = await self.repository.get_user_by_id(user_id)
+        user = self.repository.get_user_by_id(user_id)
         if user is None:
             raise UserNotFound(info={"error": "No user with this id exists", "data":f"User id: {user_id}"})
         
@@ -103,23 +104,21 @@ class UserService:
     async def update_user_profile(self, user_id: int, user_data: UserUpdateModel, current_user: User) -> UserOutModel:
         if user_id != current_user.id:
             raise UpdateNotAllowed(info={"error": "You cant update a profile that is not yours"})
-        
-        user_to_update = await self.get_user_by_id(user_id)
-        if user_to_update.email == user_data.email and user_to_update.username == user_data.username:
-            user_to_update = await self.repository.update_user(user_to_update, user_data)
-        elif user_to_update.email != user_data.email and user_to_update.username == user_data.username:
-            if await self.repository.get_user_by_email(user_data.email) is not None:
+        if current_user.email == user_data.email and current_user.username == user_data.username:
+            user_to_update = self.repository.update_user(current_user, user_data.model_dump())
+        elif current_user.email != user_data.email and current_user.username == user_data.username:
+            if self.repository.get_user_by_email(user_data.email) is not None:
                 raise UserAlreadyExists(info={"error": "This email is already registered by an other user", "data":f"Email: {user_data.email}"})
             else:
-                user_to_update = await self.repository.update_user(user_to_update, user_data)
-        elif user_to_update.email == user_data.email and user_to_update.username != user_data.username:
-            if await self.repository.is_username_already_taken(user_data.username):
+                user_to_update = self.repository.update_user(current_user, user_data.model_dump())
+        elif current_user.email == user_data.email and current_user.username != user_data.username:
+            if self.repository.is_username_already_taken(user_data.username):
                 raise UserAlreadyExists(info={"error": "This username is already registered by an other user", "data":f"Username: {user_data.username}"})
             else:
-                user_to_update = await self.repository.update_user(user_to_update, user_data)
+                user_to_update = self.repository.update_user(current_user, user_data.model_dump())
         else:
             if not await self.check_if_user_exists(user_data):
-                user_to_update = await self.repository.update_user(user_to_update, user_data)
+                user_to_update = self.repository.update_user(current_user, user_data.model_dump())
 
         return user_to_update
     
@@ -130,18 +129,18 @@ class UserService:
                                
         user_to_update = await self.get_user_by_id(user_id)
 
-        return await self.repository.update_user(user_to_update,{"role": user_role.role})
+        return self.repository.update_user(user_to_update,{"role": user_role.role})
 
     async def update_user_book(self, user_id: int, book_id: int, current_user: User) -> UserOutModelWithBooks:
         if user_id != current_user.id:
             raise UpdateNotAllowed(info={"error": "You can only registered/delete book to your own account"})
         
         user_to_update = await self.get_user_by_id(user_id)
-        book = await self.book_service.get_book_by_id(book_id)
+        book = self.book_service.get_book_by_id(book_id)
         if book in user_to_update.books:
-           return await self.repository.remove_book_to_user(user_to_update, book)
+           return self.repository.remove_book_to_user(user_to_update, book)
         else:
-            return await self.repository.add_book_to_user(user_to_update, book)
+            return self.repository.add_book_to_user(user_to_update, book)
 
     async def verify_user(self, token: str):
         try:
@@ -154,11 +153,11 @@ class UserService:
             user_to_update = await self.get_user_by_email(user_email)
             
         if user_to_update:
-            user_to_update = await self.repository.update_user(user_to_update, {"is_verified":True})
+            user_to_update = self.repository.update_user(user_to_update, {"is_verified":True})
 
     async def password_reset_request(self, user_email: PasswordResetRequest):
         email = user_email.email
-        create_message(email, settings.password_reset_request_mail_subject)
+        MailSender.create_message(email, settings.password_reset_request_mail_subject)
 
     async def password_reset_confirm(self, token :str, password_data: PasswordResetConfirm):
         try:
@@ -171,9 +170,9 @@ class UserService:
             user_to_update = await self.get_user_by_email(user_email)
 
         if password_data.confirm_password != password_data.new_password:
-            raise ResetPasswordDontMatch(info="")
+            raise ResetPasswordDontMatch(info={"error":"Wrong credentials"})
         
         password_hash = Hasher.hash_password(password_data.confirm_password)
 
-        user_to_update = await self.repository.update_user(user_to_update, {"password_hash":password_hash})
+        user_to_update = self.repository.update_user(user_to_update, {"password_hash":password_hash})
 

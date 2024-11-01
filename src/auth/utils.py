@@ -5,7 +5,6 @@ import jwt
 from src.config import settings
 from itsdangerous import  URLSafeTimedSerializer
 import logging, json, pika, time
-
 connection_parameters = pika.ConnectionParameters('localhost')
 url_serializer = URLSafeTimedSerializer(settings.url_secret_key, salt=settings.url_email_salt)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -35,7 +34,7 @@ class TokenMaker():
             token_data =jwt.decode(token,settings.jwt_secret_key , settings.jwt_algorithm)
             return token_data
         except Exception as err:
-            raise TokenDecodeFail(info={"issue":f"{err}"})
+            raise TokenDecodeFail(info={"error":f"{err}"})
         
 class UrlSerializer():
     @staticmethod
@@ -61,25 +60,26 @@ def connect_to_rabbitmq():
             print("Failed to connect to RabbitMq. Retrying in 5seconds...")
             time.sleep(5)
 
-    
-def create_message(user_email:str, subject:str):
-    message_data_dict = {}
-    message_data_dict["mail"] = user_email
-    message_data_dict["subject"] = subject
-    token = UrlSerializer.create_url_safe_token({"email":user_email})
-    message_data_dict["token"] = token
-    message_data = json.dumps(message_data_dict)
-    try:
-        connection = connect_to_rabbitmq()
-        channel = connection.channel()
-        channel.queue_declare(queue=settings.routing_key, durable=True)
-        channel.basic_publish(exchange="", routing_key=settings.routing_key, body=message_data, properties=pika.BasicProperties(delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE))
-    except Exception as err:
-        print(f"Failed to publish message: {err}")
-    finally:
-        channel.close()
-        connection.close()
+class MailSender():
+    @staticmethod
+    def create_message(user_email:str, subject:str):
+        message_data_dict = {}
+        message_data_dict["mail"] = user_email
+        message_data_dict["subject"] = subject
+        token = UrlSerializer.create_url_safe_token({"email":user_email})
+        message_data_dict["token"] = token
+        message_data = json.dumps(message_data_dict)
+        try:
+            connection = connect_to_rabbitmq()
+            channel = connection.channel()
+            channel.queue_declare(queue=settings.routing_key, durable=True)
+            channel.basic_publish(exchange="", routing_key=settings.routing_key, body=message_data, properties=pika.BasicProperties(delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE))
+        except Exception as err:
+            print(f"Failed to publish message: {err}")
+        finally:
+            channel.close()
+            connection.close()
 
-    return message_data
+        return message_data
         
 
