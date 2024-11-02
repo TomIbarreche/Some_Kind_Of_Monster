@@ -136,7 +136,7 @@ class UserService:
             raise UpdateNotAllowed(info={"error": "You can only registered/delete book to your own account"})
         
         user_to_update = await self.get_user_by_id(user_id)
-        book = self.book_service.get_book_by_id(book_id)
+        book = await self.book_service.get_book_by_id(book_id)
         if book in user_to_update.books:
            return self.repository.remove_book_to_user(user_to_update, book)
         else:

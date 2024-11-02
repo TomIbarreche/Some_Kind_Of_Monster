@@ -12,8 +12,8 @@ books_router = APIRouter()
 admin_role_checker = Depends(RoleChecker([Role.ADMIN.value]))
 content_creator_role_checker = Depends(RoleChecker([Role.ADMIN.value, Role.CONTENT_CREATOR.value]))
 access_token_bearer = Depends(TokenAccessBearer())
-@books_router.get("/", status_code=status.HTTP_200_OK, response_model=List[BookModelOut], dependencies=[content_creator_role_checker, access_token_bearer])
 
+@books_router.get("/", status_code=status.HTTP_200_OK, response_model=List[BookModelOut], dependencies=[content_creator_role_checker, access_token_bearer])
 async def get_all_books(
     search: str = "",
     limit: Annotated[int, Query(gt=0,le=100)] = 10,
@@ -32,15 +32,15 @@ async def create_book(
     _service = BookService(session)
     return await _service.create_book(book_data, current_user)
 
-@books_router.get("/{token}", status_code=status.HTTP_200_OK, response_model=BookModelOut, dependencies=[access_token_bearer])
-async def get_book_from_token(token: str, session: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _service = BookService(session)
-    return await _service.get_book_from_token(token, current_user)
-
 @books_router.get("/{book_id}", status_code=status.HTTP_200_OK, response_model=BookModelOut, dependencies=[access_token_bearer])
 async def get_book_by_id(book_id: int, session: Session = Depends(get_db)):
     _service = BookService(session)
     return await _service.get_book_by_id(book_id)
+
+@books_router.get("/{token}", status_code=status.HTTP_200_OK, response_model=BookModelOut, dependencies=[access_token_bearer])
+async def get_book_from_token(token: str, session: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _service = BookService(session)
+    return await _service.get_book_from_token(token, current_user)
 
 @books_router.patch("/{book_id}", status_code=status.HTTP_200_OK, response_model=BookModelOut, dependencies=[access_token_bearer, content_creator_role_checker])
 async def update_book(book_id: int, book_data: BookCreateModel, current_user: User = Depends(get_current_user), session: Session = Depends(get_db)):

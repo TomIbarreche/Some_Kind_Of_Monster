@@ -38,3 +38,5 @@ def test_get_user_by_id(client, create_verify_connect_standard_user):
     assert response.status_code == 200
     assert response.json()["id"] == 2
     assert response.json()["email"] == "fake@fake.fake"
+
+    

@@ -32,6 +32,7 @@ class RoleChecker:
         self.allowed_roles_list = allowed_roles_list
 
     async def __call__(self, current_user: User = Depends(get_current_user)):
+
         if current_user.role in self.allowed_roles_list:
             return True
     

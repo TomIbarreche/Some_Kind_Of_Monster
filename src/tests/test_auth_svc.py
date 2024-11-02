@@ -2,6 +2,7 @@ import json
 import pytest
 from src.auth.repository import UserRepository
 from src.auth.utils import MailSender, UrlSerializer
+from src.books.repository import BookRepository
 from src.db.models import User
 
 def test_create_user(client, monkeypatch, fake_created_user, fake_user_signup_data):
@@ -425,7 +426,7 @@ def test_password_reset_confirm(client, monkeypatch, verify_token, verified_fake
         ["verify_token","valid_password_data", None, 404, "The user with this email doesnt exists", "user_not_found"]
     ]
 )
-def test_password_reset_confrim_with_errors(client, monkeypatch, token, user, err_status_code, err_msg, err_code, request, password_data):
+def test_password_reset_confirm_with_errors(client, monkeypatch, token, user, err_status_code, err_msg, err_code, request, password_data):
     if len(token) > 1:
         token = request.getfixturevalue(token)
 
@@ -442,5 +443,3 @@ def test_password_reset_confrim_with_errors(client, monkeypatch, token, user, er
     assert response.status_code == err_status_code 
     assert response.json()["info"]["error"]== err_msg
     assert response.json()["initial_details"]["error_code"] == err_code
-
-

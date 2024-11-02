@@ -4,7 +4,7 @@ from sqlmodel import create_engine, SQLModel
 from starlette.testclient import TestClient
 from src.auth.utils import Hasher, UrlSerializer
 from src.db import get_db
-from src.db.models import User
+from src.db.models import Book, User
 from src.main import app
 from sqlmodel import create_engine, Session
 from src.config import settings
@@ -66,9 +66,27 @@ def verified_fake_user():
             "is_verified": True,
             "role": "user",
             "password_hash": Hasher.hash_password("ffffffff"),
-            "updated_at": "2024-10-29T12:06:38.591628"
+            "updated_at": "2024-10-29T12:06:38.591628",
         }
     return User(**fake_user_dict)
+
+@pytest.fixture(scope="module")
+def verified_fake_user_with_books(fake_retreive_book):
+    from src.auth.schemas import UserOutModelWithBooks
+
+    user = {
+        "id": 3,
+        "username": "Fake",
+        "first_name": "Fake",
+        "last_name": "Faky",
+        "date_of_birth": "1993-10-12",
+        "email": "fake@fake.fake",
+        "role": "user",
+        "books": [
+            fake_retreive_book
+        ]
+    }
+    return UserOutModelWithBooks(**user)
 
 @pytest.fixture(scope="module")
 def verified_fake_user_with_new_password():
@@ -116,6 +134,16 @@ def fake_user_signup_data():
         "date_of_birth":"1993-10-12"
     }
 
+@pytest.fixture(scope="module")
+def fake_content_creator_signup_data():
+    return {
+        "username":"content",
+        "email": "content@content.content",
+        "password":"ffffffff",
+        "first_name":"Sif",
+        "last_name":"Bob",
+        "date_of_birth":"1993-10-12"
+    }
 @pytest.fixture(scope="module")
 def fake_user_update_data():
     return {
@@ -226,7 +254,13 @@ def failed_signature_token():
 def verify_token():
     token = UrlSerializer.create_url_safe_token({"email":"fake@fake.fake"})
     return token
- 
+
+
+@pytest.fixture(scope="module")
+def content_creator_verify_token():
+    token = UrlSerializer.create_url_safe_token({"email":"content@content.content"})
+    return token
+
 @pytest.fixture(scope="module")
 def valid_password_data():
     return {
@@ -248,6 +282,13 @@ def signup_data():
         "password":"ffffffff"
     }
 
+@pytest.fixture(scope="module")
+def content_creator_sign_up_data():
+    return {
+        "email":"content@content.content",
+        "password":"ffffffff"
+    }
+
 @pytest.fixture(scope="function")
 def create_verify_connect_standard_user(client,fake_user_signup_data, signup_data, verify_token):
     client.post("/api/v1/auth/signup", json=fake_user_signup_data)
@@ -262,3 +303,84 @@ def connect_admin(client):
     log_admin = client.post("/api/v1/auth/login", json={"email":settings.default_admin_email, "password": settings.default_admin_password})
     admin_access_token = log_admin.json()["access_token_bearer"]
     return admin_access_token
+
+@pytest.fixture(scope="function")
+def create_verify_connect_content_creator_user(client, fake_content_creator_signup_data, content_creator_sign_up_data, content_creator_verify_token, connect_admin):
+    client.post("/api/v1/auth/signup", json=fake_content_creator_signup_data)
+    token = content_creator_verify_token
+    client.get(f"/api/v1/auth/verify/{token}")
+    admin_token = connect_admin
+    client.patch(f"/api/v1/auth/profile/2/role_attribution", json={"role": "content_creator"},headers={"Authorization":f"Bearer {admin_token}"})
+    log_user = client.post("/api/v1/auth/login", json=content_creator_sign_up_data)
+    access_token = log_user.json()["access_token_bearer"]
+    return access_token
+
+@pytest.fixture(scope="function")
+def create_verify_connect_content_creator_user_2(client, fake_user_signup_data, signup_data, verify_token, connect_admin):
+    client.post("/api/v1/auth/signup", json=fake_user_signup_data)
+    token = verify_token
+    
+    client.get(f"/api/v1/auth/verify/{token}")
+    admin_token = connect_admin
+    client.patch(f"/api/v1/auth/profile/3/role_attribution", json={"role": "content_creator"},headers={"Authorization":f"Bearer {admin_token}"})
+    log_user = client.post("/api/v1/auth/login", json=signup_data)
+    access_token = log_user.json()["access_token_bearer"]
+    return access_token
+
+@pytest.fixture(scope="module")
+def fake_create_book_data():
+    return {
+        "name":"Fake v1",
+        "published_date":"2020-12-02",
+        "author":"Fake Author 1",
+        "editor": "Fake Editor 1",
+        "is_omnibus": False
+    }
+
+@pytest.fixture(scope="module")
+def fake_create_book_data_2():
+    return {
+        "name":"Coin",
+        "published_date":"2020-12-02",
+        "author":"Hello",
+        "editor": "World",
+        "is_omnibus": False
+    }
+
+@pytest.fixture(scope="module")
+def fake_retreive_book():
+    book =  {
+        "id": 1,
+        "name": "NAme v1",
+        "published_date": "2020-12-02",
+        "author": "Author 1",
+        "editor": "editor 1",
+        "is_omnibus": False,
+        "users": [
+            {
+                "id": 3,
+                "username": "Adminn",
+                "first_name": "Coin coin",
+                "last_name": "Irbaddrreche",
+                "date_of_birth": "1993-10-12",
+                "email": "aa@aa.aa",
+                "role": "content_creator"
+            }
+        ],
+        "creator_id": 2
+    }
+
+    return Book(**book)
+@pytest.fixture(scope="function")
+def create_book(client, create_verify_connect_content_creator_user, fake_create_book_data):
+    content_creator_token = create_verify_connect_content_creator_user
+    client.post("/api/v1/books", json=fake_create_book_data,headers={"Authorization":f"Bearer {content_creator_token}"})
+    return content_creator_token
+
+@pytest.fixture(scope="function")
+def create_books(client, create_verify_connect_content_creator_user, fake_create_book_data, fake_create_book_data_2):
+    content_creator_token = create_verify_connect_content_creator_user
+    client.post("/api/v1/books", json=fake_create_book_data,headers={"Authorization":f"Bearer {content_creator_token}"})
+    client.post("/api/v1/books", json=fake_create_book_data_2,headers={"Authorization":f"Bearer {content_creator_token}"})
+
+    return content_creator_token
